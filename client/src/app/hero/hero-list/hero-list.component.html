@@ -1,0 +1,38 @@
+<div class="container mat-elevation-z4">
+  <div class="loading-shade" *ngIf="isLoading">
+    <mat-spinner *ngIf="isLoading"></mat-spinner>
+  </div>
+  <h2>
+    <div style="text-align:center">英雄列表</div>
+  </h2>
+
+  <div class="mat-elevation-z4">
+    <mat-table [dataSource]="heroes">
+      <ng-container matColumnDef="no">
+        <mat-header-cell *matHeaderCellDef> 编号 </mat-header-cell>
+        <mat-cell *matCellDef="let row"> {{row.no}} </mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="name">
+        <mat-header-cell *matHeaderCellDef> 姓名 </mat-header-cell>
+        <mat-cell *matCellDef="let row"> {{row.name}} </mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="salary">
+        <mat-header-cell *matHeaderCellDef> 薪水 </mat-header-cell>
+        <mat-cell *matCellDef="let row"> {{row.salary}} </mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="description">
+        <mat-header-cell *matHeaderCellDef> 简介 </mat-header-cell>
+        <mat-cell *matCellDef="let row"> {{row.description}} </mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="isTop">
+        <mat-header-cell *matHeaderCellDef> 顶级英雄 </mat-header-cell>
+        <mat-cell *matCellDef="let row"> {{row.isTop?'是':'否'}} </mat-cell>
+      </ng-container>
+      <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+      <mat-row *matRowDef="let row; columns: displayedColumns;" 
+                [routerLink]="['/hero-detail/', row.id]"
+                class="row-hover">
+      </mat-row>
+    </mat-table>
+  </div>
+</div>

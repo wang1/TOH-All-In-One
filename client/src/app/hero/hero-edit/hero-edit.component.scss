@@ -1,0 +1,15 @@
+.form {
+  min-width: 150px;
+  max-width: 500px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.full-width:nth-last-child(0) {
+  margin-bottom: 10px;
+}
