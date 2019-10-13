@@ -1,3 +1,1430 @@
+# Nestjs, Angular 全栈开发记录
+
+本文记录了使用Nestjs, Fastify, Graphql, MongoDB, Angular, Material等工具, 进行Angular官网的英雄之旅demo的开发过程.
+
+以上工具请参见各自的官网进行学习. 对应的中文网站如下:
+
+1. 后台框架 [Nestjs](https://docs.nestjs.cn)
+2. Web框架 [Fastify](https://lavyun.gitbooks.io/fastify/content/) [其它](https://github.com/fastify/docs-chinese)
+3. 查询框架 [Graphql](https://graphql.cn/) [Nestjs-Graphql](https://docs.nestjs.cn/6/graphql)
+4. 数据库框架 [Mongoose](https://mongoosedoc.top/docs/guide.html)
+5. 前端框架 [Angular](https://angular.cn)
+6. 样式框架 [Material](https://material.angular.cn)
+
+## 前期准备
+
+1. `Nodejs, MongoDB, @nestjs/cli, @angular/cli`等先全局安装, 且以 `mongod --dbpath mongodb-data` 命令启动好数据库并保持一直运行
+2. 新建项目: `nest new toh-all-in-one` 且进入目录
+3. 安装依赖包: `yarn add @nestjs/platform-fastify fastify-static apollo-server-fastify @nestjs/graphql graphql-tools graphql type-graphql @nestjs/mongoose mongoose`
+4. 使用`vscode`打开该项目文件夹, 进行git的初始提交(以后我们将不再提及git的提交)
+
+---
+
+## 后台开发
+
+---
+
+### 使用快速的 fastify 引擎
+
+Nestjs默认使用Express引擎, 我们改用更快速的Fastify引擎. 打开 `src/main.ts` 文件, 修改如下:
+
+```TS
+import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter(),
+  );
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+以命令 `yarn run start:dev` 启动应用, 打开浏览器导航到`localhost:3000`, 看到 `Hello World`则项目构建成功.
+此时可删除`src`目录下的`app.controller.ts, app.controller.spec.ts, app.service.ts`这以后将不再使用的3个文件, 并删除`app.module.ts`文件对这些文件的引用.
+
+### 构建 hero 模块
+
+运行以下命令将生成 hero 目录且新建模块, 服务, 解析器 3 个文件, 服务和解析器文件将自动导入 hero 模块文件, hero 模块将自动导入根模块以供使用:
+
+```bash
+nest generate module hero --no-spec
+nest generate service hero --no-spec
+nest generate resolver hero --no-spec
+```
+
+### 添加并配置 Graphql 模块
+
+在根模块文件 `src/app.module.ts`中导入 Graphql模块, 并配置为 `code first` 模式(当服务器启动时将自动生成该 `gql` 文件供使用)
+
+```ts
+import { GraphQLModule } from '@nestjs/graphql';
+@Module({
+ imports: [
+  GraphQLModule.forRoot(
+    {autoSchemaFile: 'schema.gql',}
+  )
+]
+```
+
+### 连接 MongoDB, 构建相关文件
+
+在根模块文件 `src/app.module.ts`中导入数据库模块, 并配置将在服务启动时自动连接并生成 `tohallinone` 数据库
+
+```ts
+import { MongooseModule } from '@nestjs/mongoose';
+@Module({
+ imports: [
+  MongooseModule.forRoot('mongodb://localhost/tohallinone', {useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false})
+ ],
+})
+```
+
+此时, `src/app.module.ts` 文件如下:
+
+```ts
+import { Module } from '@nestjs/common';
+import { HeroModule } from './hero/hero.module';
+import { GraphQLModule } from '@nestjs/graphql';
+import { MongooseModule } from '@nestjs/mongoose';
+
+@Module({
+  imports: [
+    GraphQLModule.forRoot({
+      autoSchemaFile: 'schema.gql',
+    }),
+    MongooseModule.forRoot('mongodb://localhost/tohallinone', {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      useFindAndModify: false,
+    }),
+    HeroModule,
+  ],
+})
+export class AppModule {}
+```
+
+### 数据库 schema (架构)文件
+
+在 `hero` 目录新建 `hero.schema.ts` 文件如下:
+
+```ts
+import * as mongooge from 'mongoose';
+
+export const HeroSchema = new mongooge.Schema({
+  no: { type: String, required: true },
+  name: { type: String, required: true },
+  salary: { type: Number, default: 0 },
+  description: { type: String, default: '暂无介绍' },
+  isTop: { type: Boolean, default: false },
+});
+
+```
+
+该 `schema` 文件规定了数据表模式的架构, 供后面 `mongoose` 生成数据库时使用
+>说明:
+>
+> `Schema` ： 一种以文件形式存储的数据库模型骨架，**不具备数据库的操作能力**
+  
+### 接口 interface 文件
+
+在 `hero` 目录新建 `hero.interface.ts` 文件如下:
+
+```ts
+import { Document } from 'mongoose';
+
+export interface Hero extends Document {
+  readonly no: string;
+  readonly name: string;
+  readonly salary?: number;
+  readonly description?: string;
+  readonly isTop?: boolean;
+}
+```
+
+该接口文件用于进行类型检查和约束, 一般用于项目的服务(`hero.service.ts`)中.
+
+### 数据传输对象 DTO (Data Transfer Object)文件
+
+在 `hero` 目录新建 `hero.dto.ts` 文件如下:
+
+```ts
+import { ObjectType, Field, ID, Float } from 'type-graphql';
+import { IsString, IsNotEmpty, IsNumber, IsBoolean } from 'class-validator';
+
+@ObjectType()
+export class HeroDto {
+  @Field(() => ID)
+  @IsString()
+  readonly id?: string;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  readonly no: string;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  readonly name: string;
+
+  @Field({ nullable: true })
+  @Field(() => Float)
+  @IsNumber()
+  readonly salary?: number;
+
+  @Field({ nullable: true })
+  @IsString()
+  readonly description?: string;
+
+  @Field({ nullable: true })
+  @IsBoolean()
+  readonly isTop?: boolean;
+}
+```
+
+该 `DTO` 文件进行了 `ObjectType` 类型装饰, 用于定义在网络中传输的对象结构, 一般用在项目的解析器中.
+
+在代码优先的开发模式中, `Graphql` 将以此文件生成 `Object Type`.
+
+### 输入 Input 类型文件
+
+在 `hero` 目录新建 `hero.input.ts` 文件如下:
+
+```ts
+import { InputType, Field, Float } from 'type-graphql';
+
+@InputType()
+export class HeroInput {
+  @Field()
+  readonly no: string;
+
+  @Field()
+  readonly name: string;
+
+  @Field({ nullable: true })
+  @Field(() => Float)
+  readonly salary?: number;
+
+  @Field({ nullable: true })
+  readonly description?: string;
+
+  @Field({ nullable: true })
+  readonly isTop?: boolean;
+}
+```
+
+该 `input` 文件进行了`InputType` 类型装饰, 用于定义在网络中上传数据的对象结构, 一般用在项目的解析器中.
+
+在代码优先的开发模式中, `Graphql` 将以此文件生成 `Input Type`.
+> 说明:
+>
+> 该文件与前面的`DTO`文件非常类似, 为什么不直接使用 `Object Type` 呢？因为 `Object` 的字段可能存在循环引用，或者字段引用了不能作为查询输入对象的接口和联合类型。
+
+### 导入 schema
+
+在`hero.module.ts` 文件中导入 `schema` 以生成 `model` 供服务中使用, 如下:
+
+```ts
+import { Module } from '@nestjs/common';
+import { HeroService } from './hero.service';
+import { HeroResolver } from './hero.resolver';
+import { MongooseModule } from '@nestjs/mongoose';
+import { HeroSchema } from './hero.schema';
+
+@Module({
+  imports: [
+    MongooseModule.forFeature([{ name: 'HeroModel', schema: HeroSchema }]),
+  ],
+  providers: [HeroService, HeroResolver],
+})
+export class HeroModule {}
+```
+
+> `Model` ： 由 `Schema` 发布生成的模型，具有**抽象**属性和行为的数据库操作
+> `forFeature` 方法定义哪些模式架构在本模块内注册, 并给出对应的 `Model` 名称
+
+## 实现 Graphql 的 CRUD
+
+### 服务 Service
+
+打开 `hero/hero.service.ts` 文件, 实现 `CRUD` 功能, 如下:
+
+```ts
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Hero } from './hero.interface';
+import { HeroInput } from './hero.input';
+
+@Injectable()
+export class HeroService {
+  constructor(@InjectModel('HeroModel') private heroModel: Model<Hero>) {}
+
+  async create(newHero: HeroInput): Promise<Hero> {
+    return await this.heroModel(newHero).save();
+  }
+
+  async findAll(): Promise<Hero[]> {
+    return await this.heroModel.find().exec();
+  }
+
+  async findOne(id: string): Promise<Hero> {
+    return await this.heroModel.findOne({ _id: id });
+  }
+
+  async findTop(): Promise<Hero[]> {
+    return await this.heroModel.find({ isTop: true });
+  }
+
+  async delete(id: string): Promise<Hero> {
+    return await this.heroModel.findByIdAndRemove(id);
+  }
+
+  async update(id: string, updateHero: HeroInput): Promise<Hero> {
+    return await this.heroModel.findByIdAndUpdate(id, updateHero, {
+      new: true,
+    });
+  }
+}
+```
+
+>说明:
+>
+> `Entity` ： 由 `Model` 创建的实体，他的操作直接影响数据库数据
+
+### 解析器 Resolver
+
+打开 `hero/hero.resolver.ts` 文件, 实现 `Graphql` 的解析功能, 如下:
+
+```ts
+import { Resolver, Query, Args, Mutation } from '@nestjs/graphql';
+import { HeroService } from './hero.service';
+import { HeroDto } from './hero.dto';
+import { HeroInput } from './hero.input';
+
+@Resolver('Hero')
+export class HeroResolver {
+  constructor(private readonly heroService: HeroService) {}
+
+  @Query(() => [HeroDto])
+  async heroes() {
+    return this.heroService.findAll();
+  }
+
+  @Query(() => [HeroDto])
+  async topHeroes() {
+    return this.heroService.findTop();
+  }
+
+  @Query(() => HeroDto)
+  async hero(@Args('id') id: string) {
+    return this.heroService.findOne(id);
+  }
+
+  @Mutation(() => HeroDto)
+  async createHero(@Args('input') input: HeroInput) {
+    return this.heroService.create(input);
+  }
+
+  @Mutation(() => HeroDto)
+  async updateHero(@Args('id') id: string, @Args('input') input: HeroInput) {
+    return this.heroService.update(id, input);
+  }
+
+  @Mutation(() => HeroDto)
+  async deleteHero(@Args('id') id: string) {
+    return this.heroService.delete(id);
+  }
+}
+```
+
+此时, 如果应用正在运行, 则可看到项目根目录中有定义的`schema.gql`文件生成, 这是`Graphql`提供服务的核心文件.
+
+如果`resolver`文件有更改, 则该文件将自动更新.
+
+> 各 装饰器说明:
+>
+> `@Resolver('Hero')`: 告诉`Nestjs`, 这个类知道该如何解析与处理对`Hero`的各种请求. 上例中, 这些请求都委派给了`heroService`去具体处理.
+>
+> `@Query()`: 是`Graphql`的三大操作(`query, mutation, subcribe, 即查询, 变更, 订阅`)之一. 上例中, 我们定义了三种查询方式即获取所有英雄, 顶级英雄以及单个英雄
+>
+> `@Mutation()`: 类似于查询,  上例中, 我们定义了三种变更方式即新建, 更新和删除英雄
+>
+> `@Args()`: 是一个辅助装饰器, 用于在`url`中获取相关的参数数据
+
+## 运行后台服务器
+
+至此, 后台开发完毕, 如果应用没启动, 请使用 `yarn run start:dev` 进行开发模式运行.
+
+可打开 `Graphql`的控制台 `localhost:3000/graphql` 进行相关的操作.
+
+---
+
+## 前端开发
+
+---
+
+### 新建 Angular 项目
+
+在当前目录下新建 `Angular` 项目, 命名为`client`, 请选择自动生成路由和使用 scss
+
+```bash
+ng new client --skip-tests
+cd client
+ng server -o
+```
+
+此时, `localhost:4200` 应该看到 Angular 的 demo 页面.
+
+> 注意:
+>
+> 以下操作请在前端项目目录`client`中进行!
+
+### 添加 Graphql 客户端 apollo-angular
+
+因为后台提供的是`Graphql`方式的查询, 所以前端也需要能发出`Graphql`方式的请求, 我们使用`apollo`提供的`graphql`模块.
+
+在项目目录`client`中执行 `ng add apollo-angular` 安装该模块.
+
+然后在`src/app/graphql.module.ts`文件中添加`Graphql Server`的 `URL`, 并配置选项如下:
+
+```ts
+...
+import { NgModule } from '@angular/core';
+import { ApolloModule, APOLLO_OPTIONS } from 'apollo-angular';
+import { HttpLinkModule, HttpLink } from 'apollo-angular-link-http';
+import { InMemoryCache } from 'apollo-cache-inmemory';
+
+const uri = 'http://localhost:3000/graphql'; // <-- add the URL of the GraphQL server here
+export function createApollo(httpLink: HttpLink) {
+  return {
+    link: httpLink.create({ uri }),
+    cache: new InMemoryCache(),
+    defaultOptions: {
+      watchQuery: {
+        //  fetchPolicy: 'cache-and-network',
+        fetchPolicy: 'network-only', // cache更新存在问题, 暂时全部从网络获取
+        errorPolicy: 'ignore',
+      },
+      query: {
+        fetchPolicy: 'network-only',
+        errorPolicy: 'all',
+      },
+      mutate: {
+        errorPolicy: 'all',
+      },
+    },
+  };
+}
+
+@NgModule({
+  exports: [ApolloModule, HttpLinkModule],
+  providers: [
+    {
+      provide: APOLLO_OPTIONS,
+      useFactory: createApollo,
+      deps: [HttpLink],
+    },
+  ],
+})
+export class GraphQLModule {}
+...
+```
+
+### 添加 Angular Material 样式库并配置
+
+使用`ng add @angular/material`命令添加`material`样式库, 如下回答问题:
+
+```bash
+? Choose a prebuilt theme name, or "custom" for a custom theme: deeppurple-amber
+? Set up HammerJS for gesture recognition? Yes
+? Set up browser animations for Angular Material? Yes
+```
+
+打开`style.scss`文件, 修正如下:
+
+```css
+/* You can add global styles to this file, and also import other style files */
+@import '@angular/material/prebuilt-themes/deeppurple-amber.css';
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+.container {
+  position: relative;
+  padding: 5px;
+}
+
+.loading-shade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 56px;
+  right: 0;
+  background: rgba(0, 0, 0, 0.15);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flat-button {
+  margin: 5px;
+}
+```
+
+打开根模块文件`app.module.ts`导入并注册`Form`模块和`Material`模块, 修改后的根模块文件如下:
+
+```ts
+import { BrowserModule } from '@angular/platform-browser';
+import { NgModule } from '@angular/core';
+import { AppRoutingModule } from './app-routing.module';
+import { AppComponent } from './app.component';
+import { GraphQLModule } from './graphql.module';
+import { HttpClientModule } from '@angular/common/http';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import {
+  MatInputModule,
+  MatTableModule,
+  MatPaginatorModule,
+  MatSortModule,
+  MatProgressSpinnerModule,
+  MatIconModule,
+  MatButtonModule,
+  MatCardModule,
+  MatFormFieldModule,
+  MatToolbarModule,
+  MatSnackBarModule,
+  MatCheckboxModule,
+  MatTooltipModule,
+  MatGridListModule,
+} from '@angular/material';
+
+@NgModule({
+  declarations: [AppComponent],
+  imports: [
+    BrowserModule,
+    AppRoutingModule,
+    GraphQLModule,
+    HttpClientModule,
+    BrowserAnimationsModule,
+    FormsModule, // 以下来自@angular/forms模块
+    ReactiveFormsModule,
+    MatInputModule, // 以下来自@angular/material模块
+    MatTableModule,
+    MatPaginatorModule,
+    MatSortModule,
+    MatProgressSpinnerModule,
+    MatIconModule,
+    MatButtonModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatToolbarModule,
+    MatSnackBarModule,
+    MatCheckboxModule,
+    MatTooltipModule,
+    MatGridListModule,
+  ],
+  providers: [],
+  bootstrap: [AppComponent],
+})
+export class AppModule {}
+```
+
+更新根组件模板文件`app.component.html`如下:
+
+```html
+<mat-toolbar class="mat-elevation-z6 TOH-nav" color="primary">
+  <mat-icon class="icon">person</mat-icon><span> {{title}}</span>
+  <a mat-button routerLink="/hero-list">
+    <mat-icon class="icon">list</mat-icon>所有英雄
+  </a>
+  <a mat-button routerLink="/hero-top">
+    <mat-icon class="icon">thumb_up</mat-icon>顶级英雄
+  </a>
+  <a mat-button routerLink="/hero-add">
+    <mat-icon class="icon">person_add</mat-icon>添加英雄
+  </a>
+  <span class="spacer"></span>
+  <a mat-button href="https://github.com">
+    <mat-icon class="icon">star</mat-icon>GitHub
+  </a>
+</mat-toolbar>
+<div class="container">
+  <router-outlet></router-outlet>
+</div>
+```
+
+修改`app.component.ts`文件: `title = 'TOH-英雄之旅'`
+
+打开`app.component.scss`文件, 添加样式如下:
+
+```css
+.container {
+  padding: 20px;
+  margin: 60px 20px;
+}
+
+.TOH-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 8964;
+}
+
+.icon {
+  padding: 0 5px;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+```
+
+### 生成组件
+
+执行以下命令, 生成英雄列表, 顶级英雄, 英雄详情, 添加英雄, 编辑英雄组件. 
+
+该项目今后还应该有其它类型的组件, 因此归类到 hero 目录下, 同时注册在根模块中
+
+```bash
+ng g c hero/hero-list --module=app
+ng g c hero/hero-add --module=app
+ng g c hero/hero-detail --module=app
+ng g c hero/hero-top --module=app
+ng g c hero/hero-edit --module=app
+```
+
+### 更新路由
+
+配置`app-routing.module.ts`文件中的路由如下:
+
+```ts
+import { NgModule } from '@angular/core';
+import { Routes, RouterModule } from '@angular/router';
+import { HeroListComponent } from './hero/hero-list/hero-list.component';
+import { HeroTopComponent } from './hero/hero-top/hero-top.component';
+import { HeroDetailComponent } from './hero/hero-detail/hero-detail.component';
+import { HeroAddComponent } from './hero/hero-add/hero-add.component';
+import { HeroEditComponent } from './hero/hero-edit/hero-edit.component';
+
+const routes: Routes = [
+  {
+    path: 'hero-list',
+    component: HeroListComponent,
+    data: { title: '英雄列表' },
+  },
+  {
+    path: 'hero-top',
+    component: HeroTopComponent,
+    data: { title: '顶级英雄' },
+  },
+  {
+    path: 'hero-detail/:id',
+    component: HeroDetailComponent,
+    data: { title: '英雄详情' },
+  },
+  {
+    path: 'hero-add',
+    component: HeroAddComponent,
+    data: { title: '添加英雄' },
+  },
+  {
+    path: 'hero-edit/:id',
+    component: HeroEditComponent,
+    data: { title: '添加英雄' },
+  },
+  {
+    path: '',
+    redirectTo: 'hero-list',
+    pathMatch: 'full',
+  },
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule],
+})
+export class AppRoutingModule {}
+```
+
+### 生成英雄服务
+
+组件中需要与后台交互的数据我们都委派给服务去完成, 因此使用`ng g s hero/hero`新建服务如下:
+
+```ts
+import { Injectable } from '@angular/core';
+import { Apollo } from 'apollo-angular';
+import gql from 'graphql-tag';
+
+@Injectable({
+  providedIn: 'root',
+})
+export class HeroService {
+  private getHeroesGql = gql`
+    {
+      heroes {
+        id
+        no
+        name
+        salary
+        description
+        isTop
+      }
+    }
+  `;
+  private getTopHeroesGql = gql`
+  {
+    topHeroes {
+      id
+      no
+      name
+      salary
+      description
+      isTop
+    }
+  }
+`;
+  private getHeroGql = gql`
+    query getHeroGql($id: String!) {
+      hero(id: $id) {
+        id
+        no
+        name
+        salary
+        description
+        isTop
+      }
+    }
+  `;
+  private deleteHeroGql = gql`
+    mutation deleteHeroGql($id: String!) {
+      deleteHero(id: $id) {
+        id
+      }
+    }
+  `;
+  private addHeroGql = gql`
+    mutation addHeroGql(
+      $no: String!
+      $name: String!
+      $salary: Float
+      $description: String
+      $isTop: Boolean
+    ) {
+      createHero(
+        input: {
+          no: $no
+          name: $name
+          salary: $salary
+          description: $description
+          isTop: $isTop
+        }
+      ) {
+        id
+      }
+    }
+  `;
+  private updateHeroGql = gql`
+    mutation updateHeroGql(
+      $id: String!
+      $no: String!
+      $name: String!
+      $salary: Float
+      $description: String
+      $isTop: Boolean
+    ) {
+      updateHero(
+        id: $id,
+        input: {
+          no: $no
+          name: $name
+          salary: $salary
+          description: $description
+          isTop: $isTop
+        }
+      ) {
+        id
+      }
+    }
+  `;
+
+  constructor(private apollo: Apollo) {}
+
+  getHeroes() {
+    return this.apollo.watchQuery<any>({
+      query: this.getHeroesGql,
+    }).valueChanges;
+  }
+
+  getTopHeroes() {
+    return this.apollo.watchQuery<any>({
+      query: this.getTopHeroesGql,
+    }).valueChanges;
+  }
+
+  getHeroById(heroId: string) {
+    return this.apollo.watchQuery<any>({
+      query: this.getHeroGql,
+      variables: { id: heroId }, // 带参数查询
+    }).valueChanges;
+  }
+
+  deleteHero(heroId: string) {
+    return this.apollo.mutate<any>({
+      mutation: this.deleteHeroGql,
+      variables: { id: heroId },
+    });
+  }
+
+  addHero(hero: any) {
+    return this.apollo.mutate<any>({
+      mutation: this.addHeroGql,
+      variables: {
+        no: hero.no,
+        name: hero.name,
+        salary: hero.salary,
+        description: hero.description,
+        isTop: hero.isTop,
+      },
+    });
+  }
+
+  updateHero(heroId: string, hero: any) {
+    return this.apollo.mutate<any>({
+      mutation: this.updateHeroGql,
+      variables: {
+        id: heroId,
+        no: hero.no,
+        name: hero.name,
+        salary: hero.salary,
+        description: hero.description,
+        isTop: hero.isTop,
+      },
+    });
+  }
+}
+```
+
+> 说明:
+>
+> 该服务也使用了`apollo-angular`的客户端模块服务, 请仔细分析其用法!
+
+### 英雄列表组件
+
+修改 `hero-list.component.ts` 文件如下:
+
+```ts
+import { Component, OnInit } from "@angular/core";
+import { Apollo } from "apollo-angular";
+import gql from "graphql-tag";
+
+@Component({
+  selector: "app-hero-list",
+  templateUrl: "./hero-list.component.html",
+  styleUrls: ["./hero-list.component.scss"]
+})
+export class HeroListComponent implements OnInit {
+  listColumns: string[] = ["no", "name", "salary", "description", "isTop"];
+  heroes: any[];
+  isLoading = true;
+  constructor(private apollp: Apollo) {}
+
+  ngOnInit() {
+    this.apollp
+      .watchQuery<any>({
+        query: gql`
+          {
+            heroes {
+              no
+              name
+              salary
+              description
+              isTop
+            }
+          }
+        `
+      })
+      .valueChanges.subscribe(result => {
+        this.heroes = result.data && result.data.heroes;
+        this.isLoading = result.loading;
+        if (result.errors) {
+          this.isLoading = false;
+        }
+      });
+  }
+}
+```
+
+修改 `hero-list.component.html` 文件如下:
+
+```html
+<div class="container mat-elevation-z4">
+  <div class="loading-shade" *ngIf="isLoading">
+    <mat-spinner *ngIf="isLoading"></mat-spinner>
+  </div>
+  <h2>
+    <div style="text-align:center">英雄列表</div>
+  </h2>
+
+  <div class="mat-elevation-z4">
+    <mat-table [dataSource]="heroes">
+      <ng-container matColumnDef="no">
+        <mat-header-cell *matHeaderCellDef> 编号 </mat-header-cell>
+        <mat-cell *matCellDef="let row"> {{row.no}} </mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="name">
+        <mat-header-cell *matHeaderCellDef> 姓名 </mat-header-cell>
+        <mat-cell *matCellDef="let row"> {{row.name}} </mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="salary">
+        <mat-header-cell *matHeaderCellDef> 薪水 </mat-header-cell>
+        <mat-cell *matCellDef="let row"> {{row.salary}} </mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="description">
+        <mat-header-cell *matHeaderCellDef> 简介 </mat-header-cell>
+        <mat-cell *matCellDef="let row"> {{row.description}} </mat-cell>
+      </ng-container>
+      <ng-container matColumnDef="isTop">
+        <mat-header-cell *matHeaderCellDef> 顶级英雄 </mat-header-cell>
+        <mat-cell *matCellDef="let row"> {{row.isTop?'是':'否'}} </mat-cell>
+      </ng-container>
+      <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+      <mat-row *matRowDef="let row; columns: displayedColumns;" 
+                [routerLink]="['/hero-detail/', row.id]"
+                class="row-hover">
+      </mat-row>
+    </mat-table>
+  </div>
+</div>
+```
+
+修改 `hero-list.component.scss` 文件如下:
+
+```css
+.row-hover {
+  background-color: rgba(0, 0, 0, .05);
+  cursor: pointer;
+}
+```
+
+### 英雄详情组件
+
+更改英雄详情组件类文件`hero-detail.component.ts`如下:
+
+```ts
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { HeroService } from '../hero.service';
+import { MatSnackBar } from '@angular/material';
+
+@Component({
+  selector: 'app-hero-detail',
+  templateUrl: './hero-detail.component.html',
+  styleUrls: ['./hero-detail.component.scss'],
+})
+export class HeroDetailComponent implements OnInit {
+  hero: any;
+  isLoading = true;
+  constructor(
+    private activatedRoute: ActivatedRoute,
+    private router: Router,
+    private heroService: HeroService,
+    private snackBar: MatSnackBar,
+  ) {}
+
+  ngOnInit() {
+    this.heroService
+      .getHeroById(this.activatedRoute.snapshot.paramMap.get('id'))
+      .subscribe(({ data, loading }) => {
+        this.hero = data.hero;
+        this.isLoading = loading;
+      });
+  }
+
+  deleteHero() {
+    this.isLoading = true;
+    this.heroService.deleteHero(this.hero.id).subscribe(
+      ({ data }) => {
+        this.isLoading = false;
+        this.snackBar.open(`${this.hero.name}成功删除!`, '关闭', {
+          duration: 2000,
+        });
+        this.router.navigate(['/hero-list']);
+      },
+      error => (this.isLoading = false),
+    );
+  }
+}
+```
+
+更改英雄详情组件模板文件`hero-detail.component.html`如下:
+
+```html
+<div class="container mat-elevation-z4">
+  <div class="loading-shade" *ngIf="isLoading">
+    <mat-spinner *ngIf="isLoading"></mat-spinner>
+  </div>
+  <h2>
+    <div style="text-align: center;">英雄详情</div>
+  </h2>
+  <mat-card class="card">
+    <mat-card-header>
+      <mat-card-title>
+        <h2>{{hero.name}}-{{hero.no}}</h2>
+      </mat-card-title>
+      <mat-card-subtitle>
+        薪水:{{hero.salary}} {{hero.isTop?"| 顶级英雄":""}}
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <p>{{hero.description}}</p>
+    </mat-card-content>
+    <mat-card-actions style="text-align: center;">
+      <span class="flat-button">
+        <a mat-flat-button color="primary" [routerLink]="['/hero-edit/', hero.id]">
+          <mat-icon>edit</mat-icon>编辑
+        </a>
+      </span>
+      <span class="flat-button">
+        <a mat-flat-button color="warn" (click)="deleteHero()">
+          <mat-icon>delete</mat-icon>删除
+        </a>
+      </span>
+    </mat-card-actions>
+  </mat-card>
+</div>
+```
+
+### 英雄编辑组件
+
+编辑英雄使用了`material form`, 对表单数据进行了错误控制, 因此新建`hero/myErrorStateMatcher.ts`文件如下:
+
+```ts
+import { ErrorStateMatcher } from '@angular/material/core';
+import { FormControl, FormGroupDirective, NgForm } from '@angular/forms';
+
+export class MyErrorStateMatcher implements ErrorStateMatcher {
+  isErrorState(
+    control: FormControl | null,
+    form: FormGroupDirective | NgForm | null,
+  ): boolean {
+    const isSubmitted = form && form.submitted;
+    return !!(
+      control &&
+      control.invalid &&
+      (control.dirty || control.touched || isSubmitted)
+    );
+  }
+}
+```
+
+更改英雄编辑组件类文件`hero-edit.component.ts`如下:
+
+```ts
+import { Component, OnInit } from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
+import { HeroService } from '../hero.service';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { MyErrorStateMatcher } from '../myErrorStateMatcher';
+import { Location } from '@angular/common';
+import { MatSnackBar } from '@angular/material';
+
+@Component({
+  selector: 'app-hero-edit',
+  templateUrl: './hero-edit.component.html',
+  styleUrls: ['./hero-edit.component.scss'],
+})
+export class HeroEditComponent implements OnInit {
+  heroForm: FormGroup;
+  id = '';
+  no = '';
+  name = '';
+  salary = 0;
+  description = '';
+  isTop = false;
+  matcher = new MyErrorStateMatcher();
+  isLoading = false;
+
+  constructor(
+    private activatedRoute: ActivatedRoute,
+    private heroService: HeroService,
+    private formBuilder: FormBuilder,
+    private location: Location,
+    private snackBar: MatSnackBar,
+  ) {}
+
+  ngOnInit() {
+    this.heroForm = this.formBuilder.group({
+      no: ['', Validators.required],
+      name: ['', Validators.required],
+      salary: [0],
+      description: [''],
+      isTop: [false],
+    });
+    this.heroService
+      .getHeroById(this.activatedRoute.snapshot.paramMap.get('id'))
+      .subscribe(({ data }) => {
+        this.id = data.hero.id;
+        this.heroForm.setValue({
+          no: data.hero.no,
+          name: data.hero.name,
+          salary: data.hero.salary,
+          description: data.hero.description,
+          isTop: data.hero.isTop,
+        });
+      });
+  }
+
+  onFormSubmit() {
+    this.isLoading = true;
+    this.heroService
+      .updateHero(this.id, this.heroForm.value)
+      .subscribe(({ data }) => {
+        console.log(data);
+        this.isLoading = false;
+        this.snackBar.open(`${this.heroForm.value.name}保存成功!`, '关闭', {
+          duration: 2000,
+        });
+        this.goBack();
+      });
+  }
+
+  goBack() {
+    this.location.back();
+  }
+}
+```
+
+更改英雄编辑组件模板文件`hero-edit.component.html`如下:
+
+```html
+<div class="container mat-elevation-z4">
+  <div class="loading-shade" *ngIf="isLoading">
+    <mat-spinner *ngIf="isLoading"></mat-spinner>
+  </div>
+  <h2>
+    <div style="text-align: center;">编辑英雄</div>
+  </h2>
+
+  <mat-card class="card">
+    <form [formGroup]="heroForm" (ngSubmit)="onFormSubmit()">
+      <mat-form-field class="full-width">
+        <input matInput placeholder="编号" formControlName="no" 
+               required [errorStateMatcher]="matcher">
+        <mat-error>
+          <span *ngIf="!heroForm.get('no').valid && heroForm.get('no').touched">
+            请输入编号
+          </span>
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field class="full-width">
+        <input matInput placeholder="英雄姓名" formControlName="name"
+               required [errorStateMatcher]="matcher">
+        <mat-error>
+          <span *ngIf="!heroForm.get('name').valid && heroForm.get('name').touched">
+            英雄请留名
+          </span>
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field class="full-width">
+        <input type="number" min="0" matInput placeholder="薪水" formControlName="salary">
+      </mat-form-field>
+      <mat-form-field class="full-width">
+        <textarea matInput placeholder="简介" formControlName="description"></textarea>
+      </mat-form-field>
+      <!-- 不能使用form-field包含checkbox!! -->
+      <div class="full-width">
+        <mat-checkbox formControlName="isTop" color="primary">顶级英雄?</mat-checkbox>
+      </div>
+      <div style="text-align: center;">
+        <span class="flat-button">
+          <button type="submit" [disabled]="!heroForm.valid" 
+                  mat-raised-button color="primary" matTooltip="保存英雄">
+            <mat-icon>save</mat-icon>保 存
+          </button>
+        </span>
+        <!-- 注意不能使用button, 一个form中只能有一个button!! -->
+        <span class="flat-button">
+          <a mat-raised-button color="warn" matTooltip="放弃" (click)="goBack()">
+            <mat-icon>transit_enterexit</mat-icon>放 弃
+          </a>
+        </span>
+      </div>
+    </form>
+  </mat-card>
+</div>
+```
+
+更改英雄编辑组件样式文件`hero-edit.component.scss`如下:
+
+```css
+.form {
+  min-width: 150px;
+  max-width: 500px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.full-width:nth-last-child(0) {
+  margin-bottom: 10px;
+}
+```
+
+### 添加英雄组件
+
+更改添加英雄组件类文件`hero-add.component.ts`如下:
+
+```ts
+import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
+import { HeroService } from '../hero.service';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { MatSnackBar } from '@angular/material';
+import { MyErrorStateMatcher } from '../myErrorStateMatcher';
+import { Location } from '@angular/common';
+
+@Component({
+  selector: 'app-hero-add',
+  templateUrl: './hero-add.component.html',
+  styleUrls: ['./hero-add.component.scss'],
+})
+export class HeroAddComponent implements OnInit {
+  heroForm: FormGroup;
+  no = '';
+  name = '';
+  salary = 0;
+  description = '';
+  isTop = false;
+  matcher = new MyErrorStateMatcher();
+  isLoading = false;
+  constructor(
+    private router: Router,
+    private heroService: HeroService,
+    private formBuilder: FormBuilder,
+    private snackBar: MatSnackBar,
+    private location: Location,
+  ) {}
+
+  ngOnInit() {
+    this.heroForm = this.formBuilder.group({
+      no: ['', Validators.required],
+      name: ['', Validators.required],
+      salary: [0],
+      description: [''],
+      isTop: [false],
+    });
+  }
+
+  onFormSubmit() {
+    this.isLoading = true;
+    this.heroService.addHero(this.heroForm.value).subscribe(({ data }) => {
+      this.isLoading = false;
+      this.snackBar.open(`${this.heroForm.value.name}添加成功!`, '关闭', {
+        duration: 2000,
+      });
+      this.router.navigate(['/hero-detail', data.createHero.id]);
+    });
+  }
+
+  goBack() {
+    this.location.back();
+  }
+}
+```
+
+更改添加英雄组件模板文件`hero-add.component.html`如下:
+
+```html
+<div class="container mat-elevation-z4">
+  <div class="loading-shade" *ngIf="isLoading">
+    <mat-spinner *ngIf="isLoading"></mat-spinner>
+  </div>
+  <h2>
+    <div style="text-align: center;">添加英雄</div>
+  </h2>
+  <mat-card class="card">
+    <form [formGroup]="heroForm" (ngSubmit)="onFormSubmit()">
+      <mat-form-field class="full-width">
+        <input matInput placeholder="编号" formControlName="no" required [errorStateMatcher]="matcher">
+        <mat-error>
+          <span *ngIf="!heroForm.get('no').valid && heroForm.get('no').touched">请输入编号</span>
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field class="full-width">
+        <input matInput placeholder="英雄姓名" formControlName="name" required [errorStateMatcher]="matcher">
+        <mat-error>
+          <span *ngIf="!heroForm.get('name').valid && heroForm.get('name').touched">英雄请留名</span>
+        </mat-error>
+      </mat-form-field>
+      <mat-form-field class="full-width">
+        <input type="number" min="0" matInput placeholder="薪水" formControlName="salary">
+      </mat-form-field>
+      <mat-form-field class="full-width">
+        <textarea matInput placeholder="简介" formControlName="description"></textarea>
+      </mat-form-field>
+      <!-- 不能使用form-field包含checkbox!! -->
+      <div class="full-width">
+        <mat-checkbox formControlName="isTop" color="primary">顶级英雄?</mat-checkbox>
+      </div>
+      <div style="text-align: center;">
+        <span class="flat-button">
+          <button type="submit" [disabled]="!heroForm.valid" mat-raised-button color="primary" matTooltip="保存英雄">
+            <mat-icon>save</mat-icon>保 存
+          </button>
+        </span>
+        <span class="flat-button">
+          <a mat-raised-button color="warn" matTooltip="放弃" (click)="goBack()">
+            <mat-icon>transit_enterexit</mat-icon>放 弃
+          </a>
+        </span>
+      </div>
+    </form>
+  </mat-card>
+</div>
+```
+
+更改添加英雄组件样式文件`hero-add.component.scss`如下:
+
+```css
+.form {
+  min-width: 150px;
+  max-width: 500px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.full-width:nth-last-child(0) {
+  margin-bottom: 10px;
+}
+```
+
+### 顶级英雄组件
+
+更改顶级英雄组件类文件`hero-top.component.ts`如下:
+
+```ts
+import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
+import { HeroService } from '../hero.service';
+
+@Component({
+  selector: 'app-hero-top',
+  templateUrl: './hero-top.component.html',
+  styleUrls: ['./hero-top.component.scss'],
+})
+export class HeroTopComponent implements OnInit {
+  topHeroes: any[];
+  isLoading = true;
+  constructor(private heroService: HeroService) {}
+
+  ngOnInit() {
+    this.heroService.getTopHeroes().subscribe(({ data }) => {
+      this.topHeroes = data.topHeroes;
+      this.isLoading = false;
+    });
+  }
+}
+```
+
+更改顶级英雄组件模板文件`hero-top.component.html`如下:
+
+```html
+<div class="container mat-elevation-z4">
+  <div class="loading-shade" *ngIf="isLoading">
+    <mat-spinner *ngIf="isLoading"></mat-spinner>
+  </div>
+  <h2>
+    <div style="text-align:center">顶级英雄</div>
+  </h2>
+  <mat-grid-list cols="4" rowHeight="2:1">
+    <mat-grid-tile *ngFor="let topHero of topHeroes">
+      <mat-card [routerLink]="['/hero-detail', topHero.id]">
+        <mat-card-header>
+          <div mat-card-avatar class="hero-image"></div>
+          <mat-card-title>{{topHero.name}}</mat-card-title>
+          <mat-card-subtitle>$ {{topHero.salary}}</mat-card-subtitle>
+        </mat-card-header>
+      </mat-card>
+    </mat-grid-tile>
+  </mat-grid-list>
+</div>
+```
+
+更改顶级英雄组件样式文件`hero-top.component.scss`如下:
+
+```css
+.mat-card {
+  width: 80%;
+  cursor: pointer;
+}
+.hero-image {
+  background-image: url('https://material.angular.io/assets/img/examples/shiba1.jpg');
+  background-size: cover;
+}
+```
+
+## 前端运行
+
+至此, 前端开发完毕. 如果应用没有运行, 请使用`ng serve -o`命令, 打开浏览器`localhost:4200`可进行**CRUD**操作.
+
+## 前后端集成及运行
+
+先终止前后端程序的运行.
+
+### 编译前端
+
+在`client`目录下运行`ng build --prod`后, 将生成`client/dist/client`目录, 该目录下即为前端的所有经过优化和压缩后的文件.
+
+### 集成前端到后台
+
+打开**Nestjs**项目下的`src/main.ts`文件, 修改如下:
+
+```ts
+import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { AppModule } from './app.module';
+import { join } from 'path';
+
+async function bootstrap() {
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter(),
+  );
+  app.useStaticAssets({
+    root: join(__dirname, '..', 'client/dist/client'),
+    prefix: '/',
+  });
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+## 运行
+
+打开**Nestjs**项目根目录下运行`yarn run start`即可打开浏览器`localhost:3000`看到项目的运行
+
+## 收工
+
+
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo_text.svg" width="320" alt="Nest Logo" /></a>
 </p>
