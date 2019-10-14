@@ -44,6 +44,7 @@ bootstrap();
 ```
 
 以命令 `yarn run start:dev` 启动应用, 打开浏览器导航到`localhost:3000`, 看到 `Hello World`则项目构建成功.
+
 此时可删除`src`目录下的`app.controller.ts, app.controller.spec.ts, app.service.ts`这以后将不再使用的3个文件, 并删除`app.module.ts`文件对这些文件的引用.
 
 ### 构建 hero 模块
