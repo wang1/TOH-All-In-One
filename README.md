@@ -816,43 +816,26 @@ export class HeroService {
 修改 `hero-list.component.ts` 文件如下:
 
 ```ts
-import { Component, OnInit } from "@angular/core";
-import { Apollo } from "apollo-angular";
-import gql from "graphql-tag";
+import { Component, OnInit } from '@angular/core';
+import { HeroService } from '../hero.service';
 
 @Component({
-  selector: "app-hero-list",
-  templateUrl: "./hero-list.component.html",
-  styleUrls: ["./hero-list.component.scss"]
+  selector: 'app-hero-list',
+  templateUrl: './hero-list.component.html',
+  styleUrls: ['./hero-list.component.scss'],
 })
 export class HeroListComponent implements OnInit {
-  listColumns: string[] = ["no", "name", "salary", "description", "isTop"];
+  // 决定表格中要显示的列和顺序
+  displayedColumns: string[] = ['no', 'name', 'salary', 'description', 'isTop'];
   heroes: any[];
   isLoading = true;
-  constructor(private apollp: Apollo) {}
+  constructor(private heroService: HeroService) {}
 
   ngOnInit() {
-    this.apollp
-      .watchQuery<any>({
-        query: gql`
-          {
-            heroes {
-              no
-              name
-              salary
-              description
-              isTop
-            }
-          }
-        `
-      })
-      .valueChanges.subscribe(result => {
-        this.heroes = result.data && result.data.heroes;
-        this.isLoading = result.loading;
-        if (result.errors) {
-          this.isLoading = false;
-        }
-      });
+    this.heroService.getHeroes().subscribe(result => {
+      this.heroes = result.data && result.data.heroes;
+      this.isLoading = result.loading;
+    });
   }
 }
 ```
