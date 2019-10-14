@@ -1396,7 +1396,9 @@ bootstrap();
 
 ## 运行
 
-打开**Nestjs**项目根目录下运行`yarn run start`即可打开浏览器`localhost:3000`看到项目的运行
+在**Nestjs**项目根目录下运行`yarn run start`即可打开浏览器`localhost:3000`看到项目的运行.
+
+如果出现**404**, 可使用命令`ts-node -r tsconfig-paths/register src/main.ts`试试.
 
 ## 收工
 
