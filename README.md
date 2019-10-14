@@ -394,7 +394,6 @@ ng server -o
 然后在`src/app/graphql.module.ts`文件中添加`Graphql Server`的 `URL`, 并配置选项如下:
 
 ```ts
-...
 import { NgModule } from '@angular/core';
 import { ApolloModule, APOLLO_OPTIONS } from 'apollo-angular';
 import { HttpLinkModule, HttpLink } from 'apollo-angular-link-http';
@@ -433,7 +432,6 @@ export function createApollo(httpLink: HttpLink) {
   ],
 })
 export class GraphQLModule {}
-...
 ```
 
 ### 添加 Angular Material 样式库并配置
@@ -620,27 +618,22 @@ const routes: Routes = [
   {
     path: 'hero-list',
     component: HeroListComponent,
-    data: { title: '英雄列表' },
   },
   {
     path: 'hero-top',
     component: HeroTopComponent,
-    data: { title: '顶级英雄' },
   },
   {
     path: 'hero-detail/:id',
     component: HeroDetailComponent,
-    data: { title: '英雄详情' },
   },
   {
     path: 'hero-add',
     component: HeroAddComponent,
-    data: { title: '添加英雄' },
   },
   {
     path: 'hero-edit/:id',
     component: HeroEditComponent,
-    data: { title: '添加英雄' },
   },
   {
     path: '',

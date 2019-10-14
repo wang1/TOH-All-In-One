@@ -10,27 +10,22 @@ const routes: Routes = [
   {
     path: 'hero-list',
     component: HeroListComponent,
-    data: { title: '英雄列表' },
   },
   {
     path: 'hero-top',
     component: HeroTopComponent,
-    data: { title: '顶级英雄' },
   },
   {
     path: 'hero-detail/:id',
     component: HeroDetailComponent,
-    data: { title: '英雄详情' },
   },
   {
     path: 'hero-add',
     component: HeroAddComponent,
-    data: { title: '添加英雄' },
   },
   {
     path: 'hero-edit/:id',
     component: HeroEditComponent,
-    data: { title: '添加英雄' },
   },
   {
     path: '',
