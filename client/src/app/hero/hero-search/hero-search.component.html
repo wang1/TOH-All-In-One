@@ -1,0 +1,13 @@
+<mat-form-field>
+  <!-- (input)是该输入框的键入事件 -->
+  <!-- [matAutocomplete]="heroName"与自动完成面板关联 -->
+  <input matInput type="type" #searchBox 
+        (input)="search(searchBox.value)" 
+        [matAutocomplete]="heroName" />
+  <mat-autocomplete #heroName="matAutocomplete">
+    <mat-option *ngFor="let hero of heroes" 
+                [routerLink]="[ '/hero-detail', hero.id ]">
+      {{hero.name}}
+    </mat-option>
+  </mat-autocomplete>
+</mat-form-field>

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Apollo } from 'apollo-angular';
 import gql from 'graphql-tag';
+import { of } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
@@ -19,17 +20,17 @@ export class HeroService {
     }
   `;
   private getTopHeroesGql = gql`
-  {
-    topHeroes {
-      id
-      no
-      name
-      salary
-      description
-      isTop
+    {
+      topHeroes {
+        id
+        no
+        name
+        salary
+        description
+        isTop
+      }
     }
-  }
-`;
+  `;
   private getHeroGql = gql`
     query getHeroGql($id: String!) {
       hero(id: $id) {
@@ -39,6 +40,14 @@ export class HeroService {
         salary
         description
         isTop
+      }
+    }
+  `;
+  private getSomeHeroGql = gql`
+    query getSomeHeroGql($termInName: String!) {
+      searchHeroByName(stringInName: $termInName) {
+        name
+        id
       }
     }
   `;
@@ -80,7 +89,7 @@ export class HeroService {
       $isTop: Boolean
     ) {
       updateHero(
-        id: $id,
+        id: $id
         input: {
           no: $no
           name: $name
@@ -112,6 +121,17 @@ export class HeroService {
     return this.apollo.watchQuery<any>({
       query: this.getHeroGql,
       variables: { id: heroId }, // 带参数查询
+    }).valueChanges;
+  }
+
+  searchHeroesByName(term: string) {
+    // if not search term, return empty data object.非常重要
+    if (!term.trim()) {
+      return of({ data: {} });
+    }
+    return this.apollo.watchQuery<any>({
+      query: this.getSomeHeroGql,
+      variables: { termInName: term }, // 带参数查询
     }).valueChanges;
   }
 

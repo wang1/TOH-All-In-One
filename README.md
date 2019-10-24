@@ -281,6 +281,10 @@ export class HeroService {
     return await this.heroModel.find({ isTop: true });
   }
 
+  async searchByName(stringInName: string): Promise<Hero[]> {
+    return await this.heroModel.find({ name: new RegExp(stringInName) }, 'name');
+  }
+
   async delete(id: string): Promise<Hero> {
     return await this.heroModel.findByIdAndRemove(id);
   }
@@ -310,32 +314,37 @@ import { HeroInput } from './hero.input';
 @Resolver('Hero')
 export class HeroResolver {
   constructor(private readonly heroService: HeroService) {}
-
+  // 查询所有英雄
   @Query(() => [HeroDto])
   async heroes() {
     return this.heroService.findAll();
   }
-
+  // 查询顶级英雄
   @Query(() => [HeroDto])
   async topHeroes() {
     return this.heroService.findTop();
   }
-
+  // 通过id得到一个英雄
   @Query(() => HeroDto)
   async hero(@Args('id') id: string) {
     return this.heroService.findOne(id);
   }
-
+  // 通过某些字符模糊查询英雄
+  @Query(() => [HeroDto])
+  async searchHeroByName(@Args('stringInName') stringInName: string) {
+    return this.heroService.searchByName(stringInName);
+  }
+  // 新建英雄
   @Mutation(() => HeroDto)
   async createHero(@Args('input') input: HeroInput) {
     return this.heroService.create(input);
   }
-
+  // 更新英雄
   @Mutation(() => HeroDto)
   async updateHero(@Args('id') id: string, @Args('input') input: HeroInput) {
     return this.heroService.update(id, input);
   }
-
+  // 删除英雄
   @Mutation(() => HeroDto)
   async deleteHero(@Args('id') id: string) {
     return this.heroService.delete(id);
@@ -502,6 +511,7 @@ import {
   MatCheckboxModule,
   MatTooltipModule,
   MatGridListModule,
+  MatAutocompleteModule,
 } from '@angular/material';
 
 @NgModule({
@@ -528,6 +538,7 @@ import {
     MatCheckboxModule,
     MatTooltipModule,
     MatGridListModule,
+    MatAutocompleteModule,
   ],
   providers: [],
   bootstrap: [AppComponent],
@@ -548,6 +559,10 @@ export class AppModule {}
   </a>
   <a mat-button routerLink="/hero-add">
     <mat-icon class="icon">person_add</mat-icon>添加英雄
+  </a>
+  <a mat-button>
+    <mat-icon class="icon">search</mat-icon>查找英雄
+    <app-hero-search></app-hero-search>
   </a>
   <span class="spacer"></span>
   <a mat-button href="https://github.com">
@@ -574,7 +589,9 @@ export class AppModule {}
   top: 0;
   left: 0;
   right: 0;
-  z-index: 8964;
+  //原来设了个8964, 但导航上增加"查找英雄"后有个自动完成面板,
+  // angular默认设该自动完成面板z-index: 1000. 故改为89
+  z-index: 89;
 }
 
 .icon {
@@ -589,7 +606,7 @@ export class AppModule {}
 
 ### 生成组件
 
-执行以下命令, 生成英雄列表, 顶级英雄, 英雄详情, 添加英雄, 编辑英雄组件. 
+执行以下命令, 生成英雄列表, 顶级英雄, 英雄详情, 添加英雄, 编辑英雄以及查找英雄等组件.
 
 该项目今后还应该有其它类型的组件, 因此归类到 hero 目录下, 同时注册在根模块中
 
@@ -599,6 +616,7 @@ ng g c hero/hero-add --module=app
 ng g c hero/hero-detail --module=app
 ng g c hero/hero-top --module=app
 ng g c hero/hero-edit --module=app
+ng g c hero/hero-search --module=app
 ```
 
 ### 更新路由
@@ -698,6 +716,14 @@ export class HeroService {
       }
     }
   `;
+  private getSomeHeroGql = gql`
+    query getSomeHeroGql($termInName: String!) {
+      searchHeroByName(stringInName: $termInName) {
+        name
+        id
+      }
+    }
+  `;
   private deleteHeroGql = gql`
     mutation deleteHeroGql($id: String!) {
       deleteHero(id: $id) {
@@ -768,6 +794,17 @@ export class HeroService {
     return this.apollo.watchQuery<any>({
       query: this.getHeroGql,
       variables: { id: heroId }, // 带参数查询
+    }).valueChanges;
+  }
+
+  searchHeroesByName(term: string) {
+    // if not search term, return empty data object.非常重要
+    if (!term.trim()) {
+      return of({ data: {} });
+    }
+    return this.apollo.watchQuery<any>({
+      query: this.getSomeHeroGql,
+      variables: { termInName: term }, // 带参数查询
     }).valueChanges;
   }
 
@@ -1358,6 +1395,74 @@ export class HeroTopComponent implements OnInit {
 }
 ```
 
+### 查找英雄组件
+
+更改查找英雄组件文件`hero-search.component.ts`如下:
+
+```ts
+import { Component, OnInit } from '@angular/core';
+import { Observable, Subject } from 'rxjs';
+import { HeroService } from '../hero.service';
+import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+
+@Component({
+  selector: 'app-hero-search',
+  templateUrl: './hero-search.component.html',
+  styleUrls: ['./hero-search.component.scss'],
+})
+export class HeroSearchComponent implements OnInit {
+  heroes: any[];
+  // Subject 既是可观察对象的数据源，本身也是 Observable。
+  // 你可以像订阅任何 Observable 一样订阅 Subject。
+  // 你还可以通过调用它的 next(value) 方法往 Observable 中推送一些值
+
+  private searchTerms = new Subject<any>();
+
+  constructor(private heroService: HeroService) {}
+  // 每当用户在文本框中输入时，这个事件绑定就会使用文本框的值（搜索词）调用 search() 函数。
+  // searchTerms 变成了一个能发出搜索词的稳定的流。
+  search(term: string): void {
+    this.searchTerms.next(term);
+  }
+
+  ngOnInit() {
+    // 如果每当用户击键后就直接调用 heroService.searchHeroesByName将导致创建海量的 HTTP 请求，浪费服务器资源并消耗大量网络流量。
+    // 往 searchTerms 这个可观察对象的处理管道中加入了一系列 RxJS 操作符, 缩减对 heroService.searchHeroesByName 的调用次数
+    this.searchTerms
+      .pipe(
+        // 在传出最终字符串之前，debounceTime(300) 将会等待，直到新增字符串的事件暂停了 300 毫秒
+        debounceTime(300),
+        // 确保只在过滤词变化时才发送请求
+        distinctUntilChanged(),
+        // 为每个从 debounce 和 distinctUntilChanged 中通过的搜索词调用搜索服务。
+        // 它会取消并丢弃以前的搜索可观察对象，只保留最近的
+        switchMap((term: string) => this.heroService.searchHeroesByName(term)),
+      )
+      .subscribe(({ data }) => (this.heroes = data && data.searchHeroByName));
+  }
+}
+```
+
+更改查找英雄组件模板文件`hero-search.component.html`如下:
+
+```html
+<mat-form-field>
+  <!-- (input)是该输入框的键入事件 -->
+  <!-- [matAutocomplete]="heroName"与自动完成面板关联 -->
+  <input matInput type="type" #searchBox 
+        (input)="search(searchBox.value)" 
+        [matAutocomplete]="heroName" />
+  <mat-autocomplete #heroName="matAutocomplete">
+    <mat-option *ngFor="let hero of heroes" 
+                [routerLink]="[ '/hero-detail', hero.id ]">
+      {{hero.name}}
+    </mat-option>
+  </mat-autocomplete>
+</mat-form-field>
+```
+
+> 该组件我们已经添加到根组件的导航栏中了
+
 ## 前端运行
 
 至此, 前端开发完毕. 如果应用没有运行, 请使用`ng serve -o`命令, 打开浏览器`localhost:4200`可进行**CRUD**操作.
@@ -1401,8 +1506,6 @@ bootstrap();
 如果出现**404**, 可使用命令`ts-node -r tsconfig-paths/register src/main.ts`试试.
 
 ## 收工
-
-
 
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo_text.svg" width="320" alt="Nest Logo" /></a>

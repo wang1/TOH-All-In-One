@@ -21,15 +21,25 @@ import {
   MatCheckboxModule,
   MatTooltipModule,
   MatGridListModule,
+  MatAutocompleteModule,
 } from '@angular/material';
 import { HeroListComponent } from './hero/hero-list/hero-list.component';
 import { HeroAddComponent } from './hero/hero-add/hero-add.component';
 import { HeroDetailComponent } from './hero/hero-detail/hero-detail.component';
 import { HeroTopComponent } from './hero/hero-top/hero-top.component';
 import { HeroEditComponent } from './hero/hero-edit/hero-edit.component';
+import { HeroSearchComponent } from './hero/hero-search/hero-search.component';
 
 @NgModule({
-  declarations: [AppComponent, HeroListComponent, HeroAddComponent, HeroDetailComponent, HeroTopComponent, HeroEditComponent],
+  declarations: [
+    AppComponent,
+    HeroListComponent,
+    HeroAddComponent,
+    HeroDetailComponent,
+    HeroTopComponent,
+    HeroEditComponent,
+    HeroSearchComponent,
+  ],
   imports: [
     BrowserModule,
     AppRoutingModule,
@@ -52,6 +62,7 @@ import { HeroEditComponent } from './hero/hero-edit/hero-edit.component';
     MatCheckboxModule,
     MatTooltipModule,
     MatGridListModule,
+    MatAutocompleteModule,
   ],
   providers: [],
   bootstrap: [AppComponent],

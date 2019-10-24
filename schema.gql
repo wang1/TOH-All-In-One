@@ -30,4 +30,5 @@ type Query {
   heroes: [HeroDto!]!
   topHeroes: [HeroDto!]!
   hero(id: String!): HeroDto!
+  searchHeroByName(stringInName: String!): [HeroDto!]!
 }

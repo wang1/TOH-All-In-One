@@ -22,6 +22,11 @@ export class HeroResolver {
     return this.heroService.findOne(id);
   }
 
+  @Query(() => [HeroDto])
+  async searchHeroByName(@Args('stringInName') stringInName: string) {
+    return this.heroService.searchByName(stringInName);
+  }
+
   @Mutation(() => HeroDto)
   async createHero(@Args('input') input: HeroInput) {
     return this.heroService.create(input);

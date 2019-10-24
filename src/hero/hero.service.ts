@@ -24,6 +24,10 @@ export class HeroService {
     return await this.heroModel.find({ isTop: true });
   }
 
+  async searchByName(stringInName: string): Promise<Hero[]> {
+    return await this.heroModel.find({ name: new RegExp(stringInName) }, 'name');
+  }
+
   async delete(id: string): Promise<Hero> {
     return await this.heroModel.findByIdAndRemove(id);
   }
