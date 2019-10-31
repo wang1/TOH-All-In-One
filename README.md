@@ -13,7 +13,7 @@
 
 ## 前期准备
 
-1. `Nodejs, MongoDB, @nestjs/cli, @angular/cli`等先全局安装, 且以 `mongod --dbpath mongodb-data` 命令启动好数据库并保持一直运行
+1. `Nodejs, MongoDB, @nestjs/cli, @angular/cli`等先全局安装, 在合适目录下新建`MongoDB`数据文件存放目录`mongodb-data`, 且以 `mongod --dbpath mongodb-data` 命令启动好数据库并保持一直运行
 2. 新建项目: `nest new toh-all-in-one` 且进入目录
 3. 安装依赖包: `yarn add @nestjs/platform-fastify fastify-static apollo-server-fastify @nestjs/graphql graphql-tools graphql type-graphql @nestjs/mongoose mongoose`
 4. 使用`vscode`打开该项目文件夹, 进行git的初始提交(以后我们将不再提及git的提交)
@@ -546,6 +546,75 @@ import {
 export class AppModule {}
 ```
 
+我们打算在页面路由时使用动画过渡, 动画模块默认在`app.module.ts`中已经导入, 因此在项目根目录生成动画文件`app-animations.ts`如下:
+
+```ts
+import {
+  trigger,
+  transition,
+  style,
+  query,
+  animateChild,
+  group,
+  animate,
+  keyframes,
+} from '@angular/animations';
+// 动画可以直接在组件中定义。我们在独立的文件中定义动画，导入到app.component.ts组件中, 同时也让我们可以复用这些动画。
+// 在转场期间，新视图将直接插入在旧视图后面，并且这两个元素会同时出现在屏幕上。
+// 要防止这种情况，就要为宿主视图以及要删除和插入的子视图指定一些额外的样式。
+// 宿主视图必须使用相对定位模式，而子视图则必须使用绝对定位模式。
+// query(":enter") 语句会返回已插入的视图，query(":leave") 语句会返回已移除的视图
+// 使用 group() 函数来并行运行内部动画
+export const slideInAnimation = trigger('routeAnimations', [
+  transition('* <=> *', [
+    style({ position: 'relative' }),
+    query(':enter, :leave', [
+      style({
+        position: 'absolute',
+        top: 20,
+        left: 20,
+        width: '100%',
+      }),
+    ]),
+    // query(':enter', [
+    //   style({ left: '-100%' })
+    // ]),
+    group([
+      query(':enter', [
+        animate(
+          '1000ms ease',
+          keyframes([
+            style({ transform: 'scale(0) translateX(100%)' }),
+            style({ transform: 'scale(0.5) translateX(50%)' }),
+            style({ transform: 'scale(1) translateX(0%)' }),
+          ]),
+        ),
+      ]),
+      query(':leave', [animate('500ms ease-in', style({ left: '-200%' }))]),
+      // query(':leave', [
+      //   animate('2000ms ease', keyframes([
+      //     style({ transform: 'scale(1)', offset: 0 }),
+      //     style({ transform: 'scale(0.5) translateX(-25%) rotate(0)', offset: 0.35 }),
+      //     style({ opacity: 0, transform: 'translateX(-50%) rotate(-180deg) scale(6)', offset: 1 }),
+      //   ])),
+      // ])
+    ]),
+    // Required only if you have child animations on the page
+    // query(':leave', animateChild()),
+    // group([
+    //   query(':leave', [
+    //     animate('500ms ease-in', style({ left: '100%' }))
+    //   ]),
+    //   query(':enter', [
+    //     animate('500ms 200ms ease-in', style({ left: '0%' }))
+    //   ]),
+    // ]),
+    // Required only if you have child animations on the page
+    // query(':enter', animateChild()),
+  ]),
+]);
+```
+
 更新根组件模板文件`app.component.html`如下:
 
 ```html
@@ -569,12 +638,39 @@ export class AppModule {}
     <mat-icon class="icon">star</mat-icon>GitHub
   </a>
 </mat-toolbar>
-<div class="container">
-  <router-outlet></router-outlet>
+<!-- 
+  定义了一个可以检测视图何时发生变化的方法，该方法会基于路由配置的 data 属性值，
+  将动画状态值赋值给动画触发器（@routeAnimation）
+  prepareRoute() 方法会获取这个 outlet 指令的值（通过 #outlet="outlet"），
+  并根据当前活动路由的自定义数据返回一个表示动画状态的字符串值。
+  你可以使用这个数据来控制各个路由之间该执行哪个转场。
+-->
+<div class="container" [@routeAnimations]="prepareRoute(outlet)">
+  <router-outlet #outlet="outlet"></router-outlet>
 </div>
 ```
 
-修改`app.component.ts`文件: `title = 'TOH-英雄之旅'`
+修改`app.component.ts`文件如下:
+
+```ts
+import { Component } from '@angular/core';
+import { slideInAnimation } from './app-animations';
+import { RouterOutlet } from '@angular/router';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.scss'],
+  animations: [slideInAnimation]
+})
+export class AppComponent {
+  title = 'TOH-英雄之旅';
+
+  prepareRoute(outlet: RouterOutlet) {
+    return outlet && outlet.activatedRouteData && outlet.activatedRouteData['animation'];
+  }
+}
+```
 
 打开`app.component.scss`文件, 添加样式如下:
 
@@ -631,32 +727,39 @@ import { HeroTopComponent } from './hero/hero-top/hero-top.component';
 import { HeroDetailComponent } from './hero/hero-detail/hero-detail.component';
 import { HeroAddComponent } from './hero/hero-add/hero-add.component';
 import { HeroEditComponent } from './hero/hero-edit/hero-edit.component';
-
+// 路由定义中的 data 属性也定义了与此路由有关的动画配置。当路由变化时，data 属性的值就会传给 AppComponent。
+// data 属性的值必须满足 routeAnimation 中定义的转场动画的要求，稍后我们就会定义它。
+// 注意：这个 data 中的属性名可以是任意的。
 const routes: Routes = [
-  {
-    path: 'hero-list',
-    component: HeroListComponent,
-  },
-  {
-    path: 'hero-top',
-    component: HeroTopComponent,
-  },
-  {
-    path: 'hero-detail/:id',
-    component: HeroDetailComponent,
-  },
-  {
-    path: 'hero-add',
-    component: HeroAddComponent,
-  },
-  {
-    path: 'hero-edit/:id',
-    component: HeroEditComponent,
-  },
   {
     path: '',
     redirectTo: 'hero-list',
     pathMatch: 'full',
+  },
+  {
+    path: 'hero-list',
+    component: HeroListComponent,
+    data: { animation: 'ListPage' },
+  },
+  {
+    path: 'hero-top',
+    component: HeroTopComponent,
+    data: { animation: 'TopPage' },
+  },
+  {
+    path: 'hero-detail/:id',
+    component: HeroDetailComponent,
+    data: { animation: 'DetailPage' },
+  },
+  {
+    path: 'hero-add',
+    component: HeroAddComponent,
+    data: { animation: 'AddPage' },
+  },
+  {
+    path: 'hero-edit/:id',
+    component: HeroEditComponent,
+    data: { animation: 'EditPage' },
   },
 ];
 
@@ -923,7 +1026,7 @@ export class HeroListComponent implements OnInit {
 修改 `hero-list.component.scss` 文件如下:
 
 ```css
-.row-hover {
+.row-hover:hover {
   background-color: rgba(0, 0, 0, .05);
   cursor: pointer;
 }

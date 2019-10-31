@@ -19,6 +19,13 @@
     <mat-icon class="icon">star</mat-icon>GitHub
   </a>
 </mat-toolbar>
-<div class="container">
-  <router-outlet></router-outlet>
+<!-- 
+  定义了一个可以检测视图何时发生变化的方法，该方法会基于路由配置的 data 属性值，
+  将动画状态值赋值给动画触发器（@routeAnimation）
+  prepareRoute() 方法会获取这个 outlet 指令的值（通过 #outlet="outlet"），
+  并根据当前活动路由的自定义数据返回一个表示动画状态的字符串值。
+  你可以使用这个数据来控制各个路由之间该执行哪个转场。
+-->
+<div class="container" [@routeAnimations]="prepareRoute(outlet)">
+  <router-outlet #outlet="outlet"></router-outlet>
 </div>
