@@ -6,7 +6,7 @@
         [matAutocomplete]="heroName" />
   <mat-autocomplete #heroName="matAutocomplete">
     <mat-option *ngFor="let hero of heroes" 
-                [routerLink]="[ '/hero-detail', hero.id ]">
+                routerLink="/hero-detail/{{hero.id}}">
       {{hero.name}}
     </mat-option>
   </mat-autocomplete>

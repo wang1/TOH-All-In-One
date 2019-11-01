@@ -564,6 +564,7 @@ import {
 // 要防止这种情况，就要为宿主视图以及要删除和插入的子视图指定一些额外的样式。
 // 宿主视图必须使用相对定位模式，而子视图则必须使用绝对定位模式。
 // query(":enter") 语句会返回已插入的视图，query(":leave") 语句会返回已移除的视图
+// optional: true 参数允许查找不到视图而不报错
 // 使用 group() 函数来并行运行内部动画
 export const slideInAnimation = trigger('routeAnimations', [
   transition('* <=> *', [
@@ -575,7 +576,7 @@ export const slideInAnimation = trigger('routeAnimations', [
         left: 20,
         width: '100%',
       }),
-    ]),
+    ], { optional: true }),
     // query(':enter', [
     //   style({ left: '-100%' })
     // ]),
@@ -589,8 +590,8 @@ export const slideInAnimation = trigger('routeAnimations', [
             style({ transform: 'scale(1) translateX(0%)' }),
           ]),
         ),
-      ]),
-      query(':leave', [animate('500ms ease-in', style({ left: '-200%' }))]),
+      ],{ optional: true }),
+      query(':leave', [animate('500ms ease-in', style({ left: '-200%' }))], { optional: true }),
       // query(':leave', [
       //   animate('2000ms ease', keyframes([
       //     style({ transform: 'scale(1)', offset: 0 }),
@@ -704,7 +705,7 @@ export class AppComponent {
 
 执行以下命令, 生成英雄列表, 顶级英雄, 英雄详情, 添加英雄, 编辑英雄以及查找英雄等组件.
 
-该项目今后还应该有其它类型的组件, 因此归类到 hero 目录下, 同时注册在根模块中
+该项目今后还应该有其它类型的组件, 因此归类到 `hero` 目录下, 同时注册在根模块中
 
 ```bash
 ng g c hero/hero-list --module=app
@@ -713,6 +714,21 @@ ng g c hero/hero-detail --module=app
 ng g c hero/hero-top --module=app
 ng g c hero/hero-edit --module=app
 ng g c hero/hero-search --module=app
+```
+
+### 生成Hero类
+
+为保证一致性, 在`hero`目录下生成`Hero`类如下:
+
+```ts
+export class Hero {
+  id: string;
+  no: string;
+  name: string;
+  description?: string;
+  salary?: number;
+  isTop?: boolean;
+}
 ```
 
 ### 更新路由
@@ -727,15 +743,16 @@ import { HeroTopComponent } from './hero/hero-top/hero-top.component';
 import { HeroDetailComponent } from './hero/hero-detail/hero-detail.component';
 import { HeroAddComponent } from './hero/hero-add/hero-add.component';
 import { HeroEditComponent } from './hero/hero-edit/hero-edit.component';
+import { HeroDetailResolverService } from './hero/hero-detail/hero-detail-resolver.service';
+
+// 这些路由的定义顺序是刻意如此设计的。路由器使用先匹配者优先的策略来匹配路由，所以，具体路由应该放在通用路由的前面。
+// 在上面的配置中，带静态路径的路由被放在了前面，后面是空路径路由，因此它会作为默认路由。
+// 而通配符路由被放在最后面，这是因为它能匹配上每一个 URL，因此应该只有在前面找不到其它能匹配的路由时才匹配它。
+// ---------------------------
 // 路由定义中的 data 属性也定义了与此路由有关的动画配置。当路由变化时，data 属性的值就会传给 AppComponent。
 // data 属性的值必须满足 routeAnimation 中定义的转场动画的要求，稍后我们就会定义它。
 // 注意：这个 data 中的属性名可以是任意的。
 const routes: Routes = [
-  {
-    path: '',
-    redirectTo: 'hero-list',
-    pathMatch: 'full',
-  },
   {
     path: 'hero-list',
     component: HeroListComponent,
@@ -750,6 +767,8 @@ const routes: Routes = [
     path: 'hero-detail/:id',
     component: HeroDetailComponent,
     data: { animation: 'DetailPage' },
+    // 注意使用了resolve预取数据, 且命名为result供组件使用
+    resolve: { result: HeroDetailResolverService}
   },
   {
     path: 'hero-add',
@@ -760,6 +779,11 @@ const routes: Routes = [
     path: 'hero-edit/:id',
     component: HeroEditComponent,
     data: { animation: 'EditPage' },
+  },
+  {
+    path: '',
+    redirectTo: 'hero-list',
+    pathMatch: 'full',
   },
 ];
 
@@ -880,7 +904,8 @@ export class HeroService {
   `;
 
   constructor(private apollo: Apollo) {}
-
+  // 由于apollo.watchQuery以及mutate返回的是一个{data:{}}格式的对象, 不能指定其类型, 故此处使用any类型
+  // TODO: 在保证类型一致性方面需要再思考
   getHeroes() {
     return this.apollo.watchQuery<any>({
       query: this.getHeroesGql,
@@ -967,7 +992,7 @@ import { HeroService } from '../hero.service';
 export class HeroListComponent implements OnInit {
   // 决定表格中要显示的列和顺序
   displayedColumns: string[] = ['no', 'name', 'salary', 'description', 'isTop'];
-  heroes: any[];
+  heroes: Hero[] = [];
   isLoading = true;
   constructor(private heroService: HeroService) {}
 
@@ -1014,7 +1039,7 @@ export class HeroListComponent implements OnInit {
         <mat-cell *matCellDef="let row"> {{row.isTop?'是':'否'}} </mat-cell>
       </ng-container>
       <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
-      <mat-row *matRowDef="let row; columns: displayedColumns;" 
+      <mat-row *matRowDef="let row; columns: displayedColumns;"
                 [routerLink]="['/hero-detail/', row.id]"
                 class="row-hover">
       </mat-row>
@@ -1034,13 +1059,63 @@ export class HeroListComponent implements OnInit {
 
 ### 英雄详情组件
 
+在 `hero-detail` 中，它必须等待路由激活, 然后才能去获取对应的英雄。
+
+这种方式一般没有问题，但是如果你在使用真实 `api`，很有可能数据返回有延迟，导致无法即时显示。
+在这种情况下，直到数据到达前，显示一个空的组件不是最好的用户体验(且浏览器控制台将出现`undefined`错误, 虽然最后得以成功显示)。
+
+其次, 到该组件的转场动画将不会生效.
+
+再者, 如果当前页面是**英雄详情**页面, 那么在搜索框中点击搜出的某个英雄本应导航到该英雄的详情页面(相同URL, 不同id), 但不会发生跳转!!!因为默认导航方式是: `onsameurlnavigation: ignore`, 而非 `reload` !
+
+因此, 它还有进步的空间。
+
+最好预先从服务器上获取完数据，这样在路由激活的那一刻数据就准备好了。
+总之，你希望的是只有当所有必要数据都已经拿到之后，才渲染这个路由组件。
+
+我们需要 `Resolve` 守卫。
+
+使用`ng g s hero/hero-detail/hero-detail-resolver`命令在`hero-detail`目录下新建`hero-detail-resolver`服务文件如下:
+
+```ts
+import { Injectable } from '@angular/core';
+import { Resolve, ActivatedRouteSnapshot } from '@angular/router';
+import { HeroService } from '../hero.service';
+import { of, Observable } from 'rxjs';
+import { take, switchMap } from 'rxjs/operators';
+
+@Injectable({
+  providedIn: 'root',
+})
+// 实现 resolve() 方法。 该方法可以返回一个 Promise、一个 Observable 来支持异步方式，或者直接返回一个值来支持同步方式。
+// heroService.getHeroById 方法返回一个可观察对象，以防止在数据获取完之前加载本路由。
+// Router 守卫要求这个可观察对象必须可结束（complete），也就是说它已经发出了所有值。
+// 你可以为 take 操作符传入一个参数 1，以确保这个可观察对象会在从 heroService.getHeroById 方法所返回的可观察对象中取到第一个值之后就会结束。
+// 将取得的数据重新包装为Observable
+export class HeroDetailResolverService implements Resolve<any> {
+  constructor(private heroService: HeroService) {}
+  resolve(activatedRouteSnapshot: ActivatedRouteSnapshot): Observable<any> {
+    return this.heroService
+      .getHeroById(activatedRouteSnapshot.paramMap.get('id'))
+      .pipe(
+        take(1),
+        switchMap(data => {
+          return of(data);
+        }),
+      );
+  }
+}
+```
+
 更改英雄详情组件类文件`hero-detail.component.ts`如下:
 
 ```ts
 import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { HeroService } from '../hero.service';
 import { MatSnackBar } from '@angular/material';
+import { Location } from '@angular/common';
+import { Hero } from '../hero';
 
 @Component({
   selector: 'app-hero-detail',
@@ -1048,36 +1123,33 @@ import { MatSnackBar } from '@angular/material';
   styleUrls: ['./hero-detail.component.scss'],
 })
 export class HeroDetailComponent implements OnInit {
-  hero: any;
+  // 以前生成空的Hero对象, 否则由于取数据的延迟, 可能导致undefined错误
+  // 现在使用resolve方式, 不存在该问题了
+  hero: Hero;
   isLoading = true;
   constructor(
     private activatedRoute: ActivatedRoute,
-    private router: Router,
+    private location: Location,
     private heroService: HeroService,
     private snackBar: MatSnackBar,
   ) {}
 
   ngOnInit() {
-    this.heroService
-      .getHeroById(this.activatedRoute.snapshot.paramMap.get('id'))
-      .subscribe(({ data, loading }) => {
-        this.hero = data.hero;
-        this.isLoading = loading;
-      });
+    this.activatedRoute.data.subscribe(({ result }) => {
+      this.hero = result.data.hero;
+      this.isLoading = result.loading;
+    });
   }
 
   deleteHero() {
     this.isLoading = true;
-    this.heroService.deleteHero(this.hero.id).subscribe(
-      ({ data }) => {
-        this.isLoading = false;
-        this.snackBar.open(`${this.hero.name}成功删除!`, '关闭', {
-          duration: 2000,
-        });
-        this.router.navigate(['/hero-list']);
-      },
-      error => (this.isLoading = false),
-    );
+    this.heroService.deleteHero(this.hero.id).subscribe(() => {
+      this.isLoading = false;
+      this.snackBar.open(`${this.hero.name}成功删除!`, '关闭', {
+        duration: 2000,
+      });
+      this.location.back();
+    });
   }
 }
 ```
@@ -1147,7 +1219,7 @@ export class MyErrorStateMatcher implements ErrorStateMatcher {
 
 ```ts
 import { Component, OnInit } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { HeroService } from '../hero.service';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MyErrorStateMatcher } from '../myErrorStateMatcher';
@@ -1202,16 +1274,13 @@ export class HeroEditComponent implements OnInit {
 
   onFormSubmit() {
     this.isLoading = true;
-    this.heroService
-      .updateHero(this.id, this.heroForm.value)
-      .subscribe(({ data }) => {
-        console.log(data);
-        this.isLoading = false;
-        this.snackBar.open(`${this.heroForm.value.name}保存成功!`, '关闭', {
-          duration: 2000,
-        });
-        this.goBack();
+    this.heroService.updateHero(this.id, this.heroForm.value).subscribe(() => {
+      this.isLoading = false;
+      this.snackBar.open(`${this.heroForm.value.name}保存成功!`, '关闭', {
+        duration: 2000,
       });
+      this.goBack();
+    });
   }
 
   goBack() {
@@ -1234,7 +1303,7 @@ export class HeroEditComponent implements OnInit {
   <mat-card class="card">
     <form [formGroup]="heroForm" (ngSubmit)="onFormSubmit()">
       <mat-form-field class="full-width">
-        <input matInput placeholder="编号" formControlName="no" 
+        <input matInput placeholder="编号" formControlName="no"
                required [errorStateMatcher]="matcher">
         <mat-error>
           <span *ngIf="!heroForm.get('no').valid && heroForm.get('no').touched">
@@ -1263,7 +1332,7 @@ export class HeroEditComponent implements OnInit {
       </div>
       <div style="text-align: center;">
         <span class="flat-button">
-          <button type="submit" [disabled]="!heroForm.valid" 
+          <button type="submit" [disabled]="!heroForm.valid"
                   mat-raised-button color="primary" matTooltip="保存英雄">
             <mat-icon>save</mat-icon>保 存
           </button>
@@ -1439,7 +1508,6 @@ export class HeroAddComponent implements OnInit {
 
 ```ts
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
 import { HeroService } from '../hero.service';
 
 @Component({
@@ -1448,7 +1516,7 @@ import { HeroService } from '../hero.service';
   styleUrls: ['./hero-top.component.scss'],
 })
 export class HeroTopComponent implements OnInit {
-  topHeroes: any[];
+  topHeroes: Hero[] = [];
   isLoading = true;
   constructor(private heroService: HeroService) {}
 
@@ -1514,12 +1582,12 @@ import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
   styleUrls: ['./hero-search.component.scss'],
 })
 export class HeroSearchComponent implements OnInit {
-  heroes: any[];
+  heroes: Hero[] = [];
   // Subject 既是可观察对象的数据源，本身也是 Observable。
   // 你可以像订阅任何 Observable 一样订阅 Subject。
   // 你还可以通过调用它的 next(value) 方法往 Observable 中推送一些值
 
-  private searchTerms = new Subject<any>();
+  private searchTerms = new Subject<string>();
 
   constructor(private heroService: HeroService) {}
   // 每当用户在文本框中输入时，这个事件绑定就会使用文本框的值（搜索词）调用 search() 函数。
@@ -1552,11 +1620,11 @@ export class HeroSearchComponent implements OnInit {
 <mat-form-field>
   <!-- (input)是该输入框的键入事件 -->
   <!-- [matAutocomplete]="heroName"与自动完成面板关联 -->
-  <input matInput type="type" #searchBox 
-        (input)="search(searchBox.value)" 
+  <input matInput type="type" #searchBox
+        (input)="search(searchBox.value)"
         [matAutocomplete]="heroName" />
   <mat-autocomplete #heroName="matAutocomplete">
-    <mat-option *ngFor="let hero of heroes" 
+    <mat-option *ngFor="let hero of heroes"
                 [routerLink]="[ '/hero-detail', hero.id ]">
       {{hero.name}}
     </mat-option>
@@ -1609,6 +1677,46 @@ bootstrap();
 如果出现**404**, 可使用命令`ts-node -r tsconfig-paths/register src/main.ts`试试.
 
 ## 收工
+
+---
+
+## 改进记录
+
+### 添加Search框
+
+### 添加转场动画
+
+### Resolve: 预先获取组件数据
+
+在 `hero-detail` 中，它必须等待路由激活, 然后才能去获取对应的英雄。
+
+这种方式一般没有问题，但是如果你在使用真实 `api`，很有可能数据返回有延迟，导致无法即时显示。
+在这种情况下，直到数据到达前，显示一个空的组件不是最好的用户体验(且浏览器控制台将出现`undefined`错误, 虽然最后得以成功显示)。
+
+其次, 到该组件的转场动画将不会生效.
+
+再者, 如果当前页面是**英雄详情**页面, 那么在搜索框中点击搜出的某个英雄本应导航到该英雄的详情页面(相同URL, 不同id), 但不会发生跳转!!!因为默认导航方式是: `onsameurlnavigation: ignore`, 而非 `reload` !
+
+因此, 它还有进步的空间。
+
+最好预先从服务器上获取完数据，这样在路由激活的那一刻数据就准备好了。
+总之，你希望的是只有当所有必要数据都已经拿到之后，才渲染这个路由组件。
+
+我们需要 `Resolve` 守卫。在`hero-detail`目录下新建`hero-detail-resolver`服务文件.
+
+实现 resolve() 方法。 该方法可以返回一个 Promise、一个 Observable 来支持异步方式，或者直接返回一个值来支持同步方式。
+
+heroService.getHeroById 方法返回一个可观察对象，以防止在数据获取完之前加载本路由。
+
+Router 守卫要求这个可观察对象必须可结束（complete），也就是说它已经发出了所有值。
+
+你可以为 take 操作符传入一个参数 1，以确保这个可观察对象会在从 heroService.getHeroById 方法所返回的可观察对象中取到第一个值之后就会结束。
+
+将取得的数据重新包装为Observable
+
+将该服务导入hero-detail的路由中, 修改hero-detail组件获取数据的方式
+
+---
 
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo_text.svg" width="320" alt="Nest Logo" /></a>

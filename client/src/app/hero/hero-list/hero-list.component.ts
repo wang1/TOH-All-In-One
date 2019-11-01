@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { HeroService } from '../hero.service';
+import { Hero } from '../hero';
 
 @Component({
   selector: 'app-hero-list',
@@ -9,7 +10,7 @@ import { HeroService } from '../hero.service';
 export class HeroListComponent implements OnInit {
   // 决定表格中要显示的列和顺序
   displayedColumns: string[] = ['no', 'name', 'salary', 'description', 'isTop'];
-  heroes: any[];
+  heroes: Hero[] = [];
   isLoading = true;
   constructor(private heroService: HeroService) {}
 

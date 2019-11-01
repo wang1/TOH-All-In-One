@@ -104,7 +104,8 @@ export class HeroService {
   `;
 
   constructor(private apollo: Apollo) {}
-
+  // 由于apollo.watchQuery以及mutate返回的是一个{data:{}}格式的对象, 不能指定其类型, 故此处使用any类型
+  // TODO: 在保证类型一致性方面需要再思考
   getHeroes() {
     return this.apollo.watchQuery<any>({
       query: this.getHeroesGql,

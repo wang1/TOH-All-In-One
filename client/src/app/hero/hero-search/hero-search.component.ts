@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
 import { HeroService } from '../hero.service';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { Hero } from '../hero';
 
 @Component({
   selector: 'app-hero-search',
@@ -9,12 +10,12 @@ import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
   styleUrls: ['./hero-search.component.scss'],
 })
 export class HeroSearchComponent implements OnInit {
-  heroes: any[];
+  heroes: Hero[] = [];
   // Subject 既是可观察对象的数据源，本身也是 Observable。
   // 你可以像订阅任何 Observable 一样订阅 Subject。
   // 你还可以通过调用它的 next(value) 方法往 Observable 中推送一些值
 
-  private searchTerms = new Subject<any>();
+  private searchTerms = new Subject<string>();
 
   constructor(private heroService: HeroService) {}
   // 每当用户在文本框中输入时，这个事件绑定就会使用文本框的值（搜索词）调用 search() 函数。

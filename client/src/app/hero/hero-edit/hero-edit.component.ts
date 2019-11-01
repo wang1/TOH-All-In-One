@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { HeroService } from '../hero.service';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MyErrorStateMatcher } from '../myErrorStateMatcher';
@@ -54,16 +54,13 @@ export class HeroEditComponent implements OnInit {
 
   onFormSubmit() {
     this.isLoading = true;
-    this.heroService
-      .updateHero(this.id, this.heroForm.value)
-      .subscribe(({ data }) => {
-        console.log(data);
-        this.isLoading = false;
-        this.snackBar.open(`${this.heroForm.value.name}保存成功!`, '关闭', {
-          duration: 2000,
-        });
-        this.goBack();
+    this.heroService.updateHero(this.id, this.heroForm.value).subscribe(() => {
+      this.isLoading = false;
+      this.snackBar.open(`${this.heroForm.value.name}保存成功!`, '关闭', {
+        duration: 2000,
       });
+      this.goBack();
+    });
   }
 
   goBack() {

@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
 import { HeroService } from '../hero.service';
+import { Hero } from '../hero';
 
 @Component({
   selector: 'app-hero-top',
@@ -8,7 +8,7 @@ import { HeroService } from '../hero.service';
   styleUrls: ['./hero-top.component.scss'],
 })
 export class HeroTopComponent implements OnInit {
-  topHeroes: any[];
+  topHeroes: Hero[] = [];
   isLoading = true;
   constructor(private heroService: HeroService) {}
 
