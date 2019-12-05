@@ -30,7 +30,7 @@ const routes: Routes = [
     component: HeroDetailComponent,
     data: { animation: 'DetailPage' },
     // 注意使用了resolve预取数据, 且命名为result供组件使用
-    resolve: { result: HeroDetailResolverService}
+    resolve: { result: HeroDetailResolverService},
   },
   {
     path: 'hero-add',

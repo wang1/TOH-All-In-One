@@ -413,20 +413,6 @@ export function createApollo(httpLink: HttpLink) {
   return {
     link: httpLink.create({ uri }),
     cache: new InMemoryCache(),
-    defaultOptions: {
-      watchQuery: {
-        //  fetchPolicy: 'cache-and-network',
-        fetchPolicy: 'network-only', // cache更新存在问题, 暂时全部从网络获取
-        errorPolicy: 'ignore',
-      },
-      query: {
-        fetchPolicy: 'network-only',
-        errorPolicy: 'all',
-      },
-      mutate: {
-        errorPolicy: 'all',
-      },
-    },
   };
 }
 
@@ -515,7 +501,15 @@ import {
 } from '@angular/material';
 
 @NgModule({
-  declarations: [AppComponent],
+  declarations: [
+    AppComponent,
+    HeroListComponent,
+    HeroAddComponent,
+    HeroDetailComponent,
+    HeroTopComponent,
+    HeroEditComponent,
+    HeroSearchComponent,
+  ],
   imports: [
     BrowserModule,
     AppRoutingModule,
@@ -546,7 +540,7 @@ import {
 export class AppModule {}
 ```
 
-我们打算在页面路由时使用动画过渡, 动画模块默认在`app.module.ts`中已经导入, 因此在项目根目录生成动画文件`app-animations.ts`如下:
+我们打算在页面路由时使用动画过渡, 动画模块`BrowserAnimationsModule`默认在`app.module.ts`中已经导入, 因此在项目根目录生成动画文件`app-animations.ts`如下:
 
 ```ts
 import {
@@ -926,7 +920,7 @@ export class HeroService {
   }
 
   searchHeroesByName(term: string) {
-    // if not search term, return empty data object.非常重要
+    // if not search term, return empty data object.非常重要, 否则组件将阻塞
     if (!term.trim()) {
       return of({ data: {} });
     }
@@ -940,6 +934,10 @@ export class HeroService {
     return this.apollo.mutate<any>({
       mutation: this.deleteHeroGql,
       variables: { id: heroId },
+      // 删除英雄后,使用refetchQueries执行查询以更新apollo的数据缓存,保证其它组件显示数据的正常
+      refetchQueries: [{
+        query: this.getHeroesGql,
+      }],
     });
   }
 
@@ -953,9 +951,13 @@ export class HeroService {
         description: hero.description,
         isTop: hero.isTop,
       },
+      // 添加英雄后,使用refetchQueries执行查询以更新apollo的数据缓存, 保证其它组件显示数据的正常
+      refetchQueries: [{
+        query: this.getHeroesGql,
+      }],
     });
   }
-
+  // 更新英雄. 似乎它将自动更新apollo的数据缓存
   updateHero(heroId: string, hero: any) {
     return this.apollo.mutate<any>({
       mutation: this.updateHeroGql,
@@ -1091,7 +1093,7 @@ import { take, switchMap } from 'rxjs/operators';
 // heroService.getHeroById 方法返回一个可观察对象，以防止在数据获取完之前加载本路由。
 // Router 守卫要求这个可观察对象必须可结束（complete），也就是说它已经发出了所有值。
 // 你可以为 take 操作符传入一个参数 1，以确保这个可观察对象会在从 heroService.getHeroById 方法所返回的可观察对象中取到第一个值之后就会结束。
-// 将取得的数据重新包装为Observable
+// 将取得的数据重新包装为Observable供 hero-detail 组件使用
 export class HeroDetailResolverService implements Resolve<any> {
   constructor(private heroService: HeroService) {}
   resolve(activatedRouteSnapshot: ActivatedRouteSnapshot): Observable<any> {
@@ -1099,9 +1101,7 @@ export class HeroDetailResolverService implements Resolve<any> {
       .getHeroById(activatedRouteSnapshot.paramMap.get('id'))
       .pipe(
         take(1),
-        switchMap(data => {
-          return of(data);
-        }),
+        switchMap(data => of(data)),
       );
   }
 }
@@ -1123,7 +1123,7 @@ import { Hero } from '../hero';
   styleUrls: ['./hero-detail.component.scss'],
 })
 export class HeroDetailComponent implements OnInit {
-  // 以前生成空的Hero对象, 否则由于取数据的延迟, 可能导致undefined错误
+  // 以前生成空的Hero对象, 由于取数据的延迟, 可能导致undefined错误
   // 现在使用resolve方式, 不存在该问题了
   hero: Hero;
   isLoading = true;
@@ -1135,6 +1135,7 @@ export class HeroDetailComponent implements OnInit {
   ) {}
 
   ngOnInit() {
+    //该路由激活时已预取了某英雄的数据, 按路由模块中该路由的设定, 命名为result
     this.activatedRoute.data.subscribe(({ result }) => {
       this.hero = result.data.hero;
       this.isLoading = result.loading;
@@ -1620,7 +1621,7 @@ export class HeroSearchComponent implements OnInit {
 <mat-form-field>
   <!-- (input)是该输入框的键入事件 -->
   <!-- [matAutocomplete]="heroName"与自动完成面板关联 -->
-  <input matInput type="type" #searchBox
+  <input matInput type="type" #searchBox placeholder="英雄大名"
         (input)="search(searchBox.value)"
         [matAutocomplete]="heroName" />
   <mat-autocomplete #heroName="matAutocomplete">
@@ -1716,6 +1717,17 @@ Router 守卫要求这个可观察对象必须可结束（complete），也就�
 
 将该服务导入hero-detail的路由中, 修改hero-detail组件获取数据的方式
 
+### Apollo-angular Cache
+
+### Guard 及 验证
+
+### errors 处理
+
+### Ngrx
+
+### 图片
+
+
 ---
 
 <p align="center">
@@ -1793,3 +1805,23 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
   Nest is [MIT licensed](LICENSE).
+
+// "graphql-codegen": "gql-gen --schema https://localhost:3000/graphql --template graphql-codegen-typescript-template --out ./src/app/graphql-types.ts \"./src/**/*.ts\""
+Note: You are using the old API of graphql-code-generator. You can easily migrate by creating "codegen.yml" file in your project with the following content:
+  
+schema:
+  - "https://localhost:3000/graphql"
+documents:
+  - "./src/**/*.ts"
+config: {}
+generates:
+  ./src/app/graphql-types.ts:
+    config: {}
+    plugins:
+      - "typescript-common"
+      - "typescript-client"
+      - "typescript-server"
+require: []
+
+
+  Then, make sure that your script is executing just "gql-gen" (without any cli flags).

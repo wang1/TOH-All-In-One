@@ -7,6 +7,7 @@ import { of } from 'rxjs';
   providedIn: 'root',
 })
 export class HeroService {
+  // 我们用graphql-tag库中的gql标签将解析查询字符串为一个Grapqhal查询文档对象
   private getHeroesGql = gql`
     {
       heroes {
@@ -46,8 +47,8 @@ export class HeroService {
   private getSomeHeroGql = gql`
     query getSomeHeroGql($termInName: String!) {
       searchHeroByName(stringInName: $termInName) {
-        name
         id
+        name
       }
     }
   `;
@@ -104,7 +105,9 @@ export class HeroService {
   `;
 
   constructor(private apollo: Apollo) {}
-  // 由于apollo.watchQuery以及mutate返回的是一个{data:{}}格式的对象, 不能指定其类型, 故此处使用any类型
+  // The watchQuery method returns a QueryRef object which has the valueChanges property that is an Observable.
+  // 由于apollo.watchQuery的valueChanges属性以及mutate返回的是一个Observable对象(该对象contains loading, error, and data properties),
+  //  不能指定其类型, 故此处使用any类型
   // TODO: 在保证类型一致性方面需要再思考
   getHeroes() {
     return this.apollo.watchQuery<any>({
@@ -126,7 +129,7 @@ export class HeroService {
   }
 
   searchHeroesByName(term: string) {
-    // if not search term, return empty data object.非常重要
+    // if not search term, return empty data object.非常重要, 否则组件将阻塞
     if (!term.trim()) {
       return of({ data: {} });
     }
@@ -140,6 +143,10 @@ export class HeroService {
     return this.apollo.mutate<any>({
       mutation: this.deleteHeroGql,
       variables: { id: heroId },
+      // 删除英雄后,使用refetchQueries执行查询以更新apollo的数据缓存,保证其它组件显示数据的正常
+      refetchQueries: [{
+        query: this.getHeroesGql,
+      }],
     });
   }
 
@@ -153,9 +160,13 @@ export class HeroService {
         description: hero.description,
         isTop: hero.isTop,
       },
+      // 添加英雄后,使用refetchQueries执行查询以更新apollo的数据缓存, 保证其它组件显示数据的正常
+      refetchQueries: [{
+        query: this.getHeroesGql,
+      }],
     });
   }
-
+  // 更新英雄. 似乎它将自动更新apollo的数据缓存
   updateHero(heroId: string, hero: any) {
     return this.apollo.mutate<any>({
       mutation: this.updateHeroGql,

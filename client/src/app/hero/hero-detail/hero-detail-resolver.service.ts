@@ -19,9 +19,7 @@ export class HeroDetailResolverService implements Resolve<any> {
       .getHeroById(activatedRouteSnapshot.paramMap.get('id'))
       .pipe(
         take(1),
-        switchMap(data => {
-          return of(data);
-        }),
+        switchMap(data => of(data)),
       );
   }
 }
