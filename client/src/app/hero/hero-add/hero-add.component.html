@@ -8,19 +8,22 @@
   <mat-card class="card">
     <form [formGroup]="heroForm" (ngSubmit)="onFormSubmit()">
       <mat-form-field class="full-width">
-        <input matInput placeholder="编号" formControlName="no" required [errorStateMatcher]="matcher">
+        <input matInput placeholder="编号" formControlName="no" required>
         <mat-error>
           <span *ngIf="!heroForm.get('no').valid && heroForm.get('no').touched">请输入编号</span>
         </mat-error>
       </mat-form-field>
       <mat-form-field class="full-width">
-        <input matInput placeholder="英雄姓名" formControlName="name" required [errorStateMatcher]="matcher">
+        <input matInput placeholder="英雄姓名(>4)" formControlName="name" required>
         <mat-error>
           <span *ngIf="!heroForm.get('name').valid && heroForm.get('name').touched">英雄请留名</span>
         </mat-error>
       </mat-form-field>
       <mat-form-field class="full-width">
-        <input type="number" min="0" matInput placeholder="薪水" formControlName="salary">
+        <input type="number" matInput placeholder="薪水" formControlName="salary">
+        <mat-error>
+          <span *ngIf="!heroForm.get('salary').valid && heroForm.get('salary').touched">合适点的薪水</span>
+        </mat-error>
       </mat-form-field>
       <mat-form-field class="full-width">
         <textarea matInput placeholder="简介" formControlName="description"></textarea>

@@ -2,7 +2,6 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { HeroService } from '../hero.service';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { MyErrorStateMatcher } from '../myErrorStateMatcher';
 import { Location } from '@angular/common';
 import { MatSnackBar } from '@angular/material';
 
@@ -13,13 +12,7 @@ import { MatSnackBar } from '@angular/material';
 })
 export class HeroEditComponent implements OnInit {
   heroForm: FormGroup;
-  id = '';
-  no = '';
-  name = '';
-  salary = 0;
-  description = '';
-  isTop = false;
-  matcher = new MyErrorStateMatcher();
+  id: string;
   isLoading = false;
 
   constructor(
@@ -33,8 +26,8 @@ export class HeroEditComponent implements OnInit {
   ngOnInit() {
     this.heroForm = this.formBuilder.group({
       no: ['', Validators.required],
-      name: ['', Validators.required],
-      salary: [0],
+      name: ['', [Validators.required, Validators.minLength(4)]],
+      salary: [8964, [Validators.min(0), Validators.max(9999999)]],
       description: [''],
       isTop: [false],
     });

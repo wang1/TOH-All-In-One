@@ -5,7 +5,7 @@ import { AppComponent } from './app.component';
 import { GraphQLModule } from './graphql.module';
 import { HttpClientModule } from '@angular/common/http';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
 import {
   MatInputModule,
   MatTableModule,
@@ -29,6 +29,7 @@ import { HeroDetailComponent } from './hero/hero-detail/hero-detail.component';
 import { HeroTopComponent } from './hero/hero-top/hero-top.component';
 import { HeroEditComponent } from './hero/hero-edit/hero-edit.component';
 import { HeroSearchComponent } from './hero/hero-search/hero-search.component';
+import { LoginComponent } from './auth/login/login.component';
 
 @NgModule({
   declarations: [
@@ -39,6 +40,7 @@ import { HeroSearchComponent } from './hero/hero-search/hero-search.component';
     HeroTopComponent,
     HeroEditComponent,
     HeroSearchComponent,
+    LoginComponent,
   ],
   imports: [
     BrowserModule,
@@ -46,7 +48,6 @@ import { HeroSearchComponent } from './hero/hero-search/hero-search.component';
     GraphQLModule,
     HttpClientModule,
     BrowserAnimationsModule,
-    FormsModule, // 以下来自@angular/forms模块
     ReactiveFormsModule,
     MatInputModule, // 以下来自@angular/material模块
     MatTableModule,

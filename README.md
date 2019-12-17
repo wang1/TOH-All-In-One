@@ -15,7 +15,19 @@
 
 1. `Nodejs, MongoDB, @nestjs/cli, @angular/cli`等先全局安装, 在合适目录下新建`MongoDB`数据文件存放目录`mongodb-data`, 且以 `mongod --dbpath mongodb-data` 命令启动好数据库并保持一直运行
 2. 新建项目: `nest new toh-all-in-one` 且进入目录
-3. 安装依赖包: `yarn add @nestjs/platform-fastify fastify-static apollo-server-fastify @nestjs/graphql graphql-tools graphql type-graphql @nestjs/mongoose mongoose`
+3. 安装依赖包:
+
+```bash
+  # fastify相关
+  yarn add @nestjs/platform-fastify fastify-static
+  # graphql相关
+  yarn add apollo-server-fastify @nestjs/graphql graphql-tools graphql type-graphql class-validator
+  # mongoDB相关
+  yarn add @nestjs/mongoose mongoose
+  # authentication相关
+  yarn add 
+```
+
 4. 使用`vscode`打开该项目文件夹, 进行git的初始提交(以后我们将不再提及git的提交)
 
 ---
@@ -45,17 +57,9 @@ bootstrap();
 
 以命令 `yarn run start:dev` 启动应用, 打开浏览器导航到`localhost:3000`, 看到 `Hello World`则项目构建成功.
 
-此时可删除`src`目录下的`app.controller.ts, app.controller.spec.ts, app.service.ts`这以后将不再使用的3个文件, 并删除`app.module.ts`文件对这些文件的引用.
+> 注意: 如果开发模式即实时监视模式不成功, 请修改`package.json`文件中`start:dev`行中为-->`dist/src/main.js`, 同时修改`nodemon.json`文件中的`exec`行中--> `node dist/src/main`, 就是指定`src`路径
 
-### 构建 hero 模块
-
-运行以下命令将生成 hero 目录且新建模块, 服务, 解析器 3 个文件, 服务和解析器文件将自动导入 hero 模块文件, hero 模块将自动导入根模块以供使用:
-
-```bash
-nest generate module hero --no-spec
-nest generate service hero --no-spec
-nest generate resolver hero --no-spec
-```
+此时可删除`src`目录下的`app.controller.ts, app.controller.spec.ts, app.service.ts`文件, 这以后将不再使用的3个文件, 并删除`app.module.ts`文件对这些文件的引用.
 
 ### 添加并配置 Graphql 模块
 
@@ -73,13 +77,17 @@ import { GraphQLModule } from '@nestjs/graphql';
 
 ### 连接 MongoDB, 构建相关文件
 
-在根模块文件 `src/app.module.ts`中导入数据库模块, 并配置将在服务启动时自动连接并生成 `tohallinone` 数据库
+在根模块文件 `src/app.module.ts`中导入数据库模块, 并配置将在服务启动时自动连接(如果没有就自动生成) `tohallinone` 数据库
 
 ```ts
 import { MongooseModule } from '@nestjs/mongoose';
 @Module({
  imports: [
-  MongooseModule.forRoot('mongodb://localhost/tohallinone', {useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false})
+  MongooseModule.forRoot('mongodb://localhost/tohallinone', {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      useFindAndModify: false,
+    })
  ],
 })
 ```
@@ -106,6 +114,20 @@ import { MongooseModule } from '@nestjs/mongoose';
   ],
 })
 export class AppModule {}
+```
+
+> 在代码优先方法中，只使用装饰器和 `TypeScript` 类来生成相应的 `GraphQL` 架构。Nest 通过使用一个惊艳的`type-graphql` 库，来提供此功能。
+
+> `autoSchemaFile` 是将自动生成的gql文件
+
+### 构建 hero 模块
+
+运行以下命令将生成 hero 目录且新建模块, 服务, 解析器 3 个文件, 服务和解析器文件将自动导入 hero 模块文件, hero 模块将自动导入根模块以供使用:
+
+```bash
+nest generate module hero --no-spec
+nest generate service hero --no-spec
+nest generate resolver hero --no-spec
 ```
 
 ### 数据库 schema (架构)文件
@@ -471,7 +493,7 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 }
 ```
 
-打开根模块文件`app.module.ts`导入并注册`Form`模块和`Material`模块, 修改后的根模块文件如下:
+打开根模块文件`app.module.ts`导入并注册`ReactiveForms`模块和`Material`模块, 修改后的根模块文件如下:
 
 ```ts
 import { BrowserModule } from '@angular/platform-browser';
@@ -481,7 +503,7 @@ import { AppComponent } from './app.component';
 import { GraphQLModule } from './graphql.module';
 import { HttpClientModule } from '@angular/common/http';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms';
 import {
   MatInputModule,
   MatTableModule,
@@ -499,6 +521,13 @@ import {
   MatGridListModule,
   MatAutocompleteModule,
 } from '@angular/material';
+import { HeroListComponent } from './hero/hero-list/hero-list.component';
+import { HeroAddComponent } from './hero/hero-add/hero-add.component';
+import { HeroDetailComponent } from './hero/hero-detail/hero-detail.component';
+import { HeroTopComponent } from './hero/hero-top/hero-top.component';
+import { HeroEditComponent } from './hero/hero-edit/hero-edit.component';
+import { HeroSearchComponent } from './hero/hero-search/hero-search.component';
+import { LoginComponent } from './auth/login/login.component';
 
 @NgModule({
   declarations: [
@@ -509,6 +538,7 @@ import {
     HeroTopComponent,
     HeroEditComponent,
     HeroSearchComponent,
+    LoginComponent,
   ],
   imports: [
     BrowserModule,
@@ -516,7 +546,6 @@ import {
     GraphQLModule,
     HttpClientModule,
     BrowserAnimationsModule,
-    FormsModule, // 以下来自@angular/forms模块
     ReactiveFormsModule,
     MatInputModule, // 以下来自@angular/material模块
     MatTableModule,
@@ -790,17 +819,19 @@ export class AppRoutingModule {}
 
 ### 生成英雄服务
 
-组件中需要与后台交互的数据我们都委派给服务去完成, 因此使用`ng g s hero/hero`新建服务如下:
+组件中需要与后台交互的数据我们都委派给服务去完成, 因此使用`ng g s hero/hero`新建服务`hero.service.ts`文件如下:
 
 ```ts
 import { Injectable } from '@angular/core';
 import { Apollo } from 'apollo-angular';
 import gql from 'graphql-tag';
+import { of } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
 })
 export class HeroService {
+  // 我们用graphql-tag库中的gql标签将解析查询字符串为一个Grapqhal查询文档对象
   private getHeroesGql = gql`
     {
       heroes {
@@ -814,17 +845,17 @@ export class HeroService {
     }
   `;
   private getTopHeroesGql = gql`
-  {
-    topHeroes {
-      id
-      no
-      name
-      salary
-      description
-      isTop
+    {
+      topHeroes {
+        id
+        no
+        name
+        salary
+        description
+        isTop
+      }
     }
-  }
-`;
+  `;
   private getHeroGql = gql`
     query getHeroGql($id: String!) {
       hero(id: $id) {
@@ -840,8 +871,8 @@ export class HeroService {
   private getSomeHeroGql = gql`
     query getSomeHeroGql($termInName: String!) {
       searchHeroByName(stringInName: $termInName) {
-        name
         id
+        name
       }
     }
   `;
@@ -883,7 +914,7 @@ export class HeroService {
       $isTop: Boolean
     ) {
       updateHero(
-        id: $id,
+        id: $id
         input: {
           no: $no
           name: $name
@@ -898,7 +929,9 @@ export class HeroService {
   `;
 
   constructor(private apollo: Apollo) {}
-  // 由于apollo.watchQuery以及mutate返回的是一个{data:{}}格式的对象, 不能指定其类型, 故此处使用any类型
+  // The watchQuery method returns a QueryRef object which has the valueChanges property that is an Observable.
+  // 由于apollo.watchQuery的valueChanges属性以及mutate返回的是一个Observable对象(该对象contains loading, error, and data properties),
+  //  不能指定其类型, 故此处使用any类型
   // TODO: 在保证类型一致性方面需要再思考
   getHeroes() {
     return this.apollo.watchQuery<any>({
@@ -957,7 +990,7 @@ export class HeroService {
       }],
     });
   }
-  // 更新英雄. 似乎它将自动更新apollo的数据缓存
+
   updateHero(heroId: string, hero: any) {
     return this.apollo.mutate<any>({
       mutation: this.updateHeroGql,
@@ -969,6 +1002,10 @@ export class HeroService {
         description: hero.description,
         isTop: hero.isTop,
       },
+      // 更新英雄后,使用refetchQueries执行查询以更新apollo的数据缓存, 保证其它组件显示数据的正常
+      refetchQueries: [{
+        query: this.getHeroesGql,
+      }],
     });
   }
 }
@@ -1195,27 +1232,6 @@ export class HeroDetailComponent implements OnInit {
 
 ### 英雄编辑组件
 
-编辑英雄使用了`material form`, 对表单数据进行了错误控制, 因此新建`hero/myErrorStateMatcher.ts`文件如下:
-
-```ts
-import { ErrorStateMatcher } from '@angular/material/core';
-import { FormControl, FormGroupDirective, NgForm } from '@angular/forms';
-
-export class MyErrorStateMatcher implements ErrorStateMatcher {
-  isErrorState(
-    control: FormControl | null,
-    form: FormGroupDirective | NgForm | null,
-  ): boolean {
-    const isSubmitted = form && form.submitted;
-    return !!(
-      control &&
-      control.invalid &&
-      (control.dirty || control.touched || isSubmitted)
-    );
-  }
-}
-```
-
 更改英雄编辑组件类文件`hero-edit.component.ts`如下:
 
 ```ts
@@ -1304,8 +1320,7 @@ export class HeroEditComponent implements OnInit {
   <mat-card class="card">
     <form [formGroup]="heroForm" (ngSubmit)="onFormSubmit()">
       <mat-form-field class="full-width">
-        <input matInput placeholder="编号" formControlName="no"
-               required [errorStateMatcher]="matcher">
+        <input matInput placeholder="编号" formControlName="no" required>
         <mat-error>
           <span *ngIf="!heroForm.get('no').valid && heroForm.get('no').touched">
             请输入编号
@@ -1313,8 +1328,7 @@ export class HeroEditComponent implements OnInit {
         </mat-error>
       </mat-form-field>
       <mat-form-field class="full-width">
-        <input matInput placeholder="英雄姓名" formControlName="name"
-               required [errorStateMatcher]="matcher">
+        <input matInput placeholder="英雄姓名(>4)" formControlName="name" required>
         <mat-error>
           <span *ngIf="!heroForm.get('name').valid && heroForm.get('name').touched">
             英雄请留名
@@ -1322,7 +1336,10 @@ export class HeroEditComponent implements OnInit {
         </mat-error>
       </mat-form-field>
       <mat-form-field class="full-width">
-        <input type="number" min="0" matInput placeholder="薪水" formControlName="salary">
+        <input type="number" matInput placeholder="薪水" formControlName="salary">
+        <mat-error>
+          <span *ngIf="!heroForm.get('salary').valid && heroForm.get('salary').touched">合适点的薪水</span>
+        </mat-error>
       </mat-form-field>
       <mat-form-field class="full-width">
         <textarea matInput placeholder="简介" formControlName="description"></textarea>
@@ -1333,12 +1350,11 @@ export class HeroEditComponent implements OnInit {
       </div>
       <div style="text-align: center;">
         <span class="flat-button">
-          <button type="submit" [disabled]="!heroForm.valid"
+          <button type="submit" [disabled]="!heroForm.valid" 
                   mat-raised-button color="primary" matTooltip="保存英雄">
             <mat-icon>save</mat-icon>保 存
           </button>
         </span>
-        <!-- 注意不能使用button, 一个form中只能有一个button!! -->
         <span class="flat-button">
           <a mat-raised-button color="warn" matTooltip="放弃" (click)="goBack()">
             <mat-icon>transit_enterexit</mat-icon>放 弃
@@ -1376,53 +1392,60 @@ export class HeroEditComponent implements OnInit {
 
 ```ts
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { HeroService } from '../hero.service';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { MatSnackBar } from '@angular/material';
-import { MyErrorStateMatcher } from '../myErrorStateMatcher';
 import { Location } from '@angular/common';
+import { MatSnackBar } from '@angular/material';
 
 @Component({
-  selector: 'app-hero-add',
-  templateUrl: './hero-add.component.html',
-  styleUrls: ['./hero-add.component.scss'],
+  selector: 'app-hero-edit',
+  templateUrl: './hero-edit.component.html',
+  styleUrls: ['./hero-edit.component.scss'],
 })
-export class HeroAddComponent implements OnInit {
+export class HeroEditComponent implements OnInit {
   heroForm: FormGroup;
-  no = '';
-  name = '';
-  salary = 0;
-  description = '';
-  isTop = false;
-  matcher = new MyErrorStateMatcher();
+  id: string;
   isLoading = false;
+
   constructor(
-    private router: Router,
+    private activatedRoute: ActivatedRoute,
     private heroService: HeroService,
     private formBuilder: FormBuilder,
-    private snackBar: MatSnackBar,
     private location: Location,
+    private snackBar: MatSnackBar,
   ) {}
 
   ngOnInit() {
     this.heroForm = this.formBuilder.group({
       no: ['', Validators.required],
-      name: ['', Validators.required],
-      salary: [0],
+      name: ['', [Validators.required, Validators.minLength(4)]],
+      salary: [8964, [Validators.min(0), Validators.max(9999999)]],
       description: [''],
       isTop: [false],
     });
+    this.heroService
+      .getHeroById(this.activatedRoute.snapshot.paramMap.get('id'))
+      .subscribe(({ data }) => {
+        this.id = data.hero.id;
+        this.heroForm.setValue({
+          no: data.hero.no,
+          name: data.hero.name,
+          salary: data.hero.salary,
+          description: data.hero.description,
+          isTop: data.hero.isTop,
+        });
+      });
   }
 
   onFormSubmit() {
     this.isLoading = true;
-    this.heroService.addHero(this.heroForm.value).subscribe(({ data }) => {
+    this.heroService.updateHero(this.id, this.heroForm.value).subscribe(() => {
       this.isLoading = false;
-      this.snackBar.open(`${this.heroForm.value.name}添加成功!`, '关闭', {
+      this.snackBar.open(`${this.heroForm.value.name}保存成功!`, '关闭', {
         duration: 2000,
       });
-      this.router.navigate(['/hero-detail', data.createHero.id]);
+      this.goBack();
     });
   }
 
@@ -1431,6 +1454,18 @@ export class HeroAddComponent implements OnInit {
   }
 }
 ```
+
+我们使用`ReactiveForm`, 要点如下:
+
+1. `app.module`中导入`ReactiveForm`模块;
+
+2. 主件类文件中导入`FormBuilder, FormGroup, Validators`;
+
+3. 使用`this.formBuilder.group`方法生成表单, 包括字段及验证限制, 可通过表单的`setValue`方法设置值, `value.name`属性获取字段的值;
+
+4. 模板文件中使用 `[formGroup]="heroForm" (ngSubmit)="onFormSubmit()"`以及`formControlName="no"`等进行绑定, 具体参见模板文件;
+
+5. `required`属性可不要, 但添加后Angular将显示一个`*`作为提示;
 
 更改添加英雄组件模板文件`hero-add.component.html`如下:
 
@@ -1445,19 +1480,22 @@ export class HeroAddComponent implements OnInit {
   <mat-card class="card">
     <form [formGroup]="heroForm" (ngSubmit)="onFormSubmit()">
       <mat-form-field class="full-width">
-        <input matInput placeholder="编号" formControlName="no" required [errorStateMatcher]="matcher">
+        <input matInput placeholder="编号" formControlName="no" required>
         <mat-error>
           <span *ngIf="!heroForm.get('no').valid && heroForm.get('no').touched">请输入编号</span>
         </mat-error>
       </mat-form-field>
       <mat-form-field class="full-width">
-        <input matInput placeholder="英雄姓名" formControlName="name" required [errorStateMatcher]="matcher">
+        <input matInput placeholder="英雄姓名(>4)" formControlName="name" required>
         <mat-error>
           <span *ngIf="!heroForm.get('name').valid && heroForm.get('name').touched">英雄请留名</span>
         </mat-error>
       </mat-form-field>
       <mat-form-field class="full-width">
-        <input type="number" min="0" matInput placeholder="薪水" formControlName="salary">
+        <input type="number" matInput placeholder="薪水" formControlName="salary">
+        <mat-error>
+          <span *ngIf="!heroForm.get('salary').valid && heroForm.get('salary').touched">合适点的薪水</span>
+        </mat-error>
       </mat-form-field>
       <mat-form-field class="full-width">
         <textarea matInput placeholder="简介" formControlName="description"></textarea>
@@ -1562,7 +1600,8 @@ export class HeroTopComponent implements OnInit {
   cursor: pointer;
 }
 .hero-image {
-  background-image: url('https://material.angular.io/assets/img/examples/shiba1.jpg');
+  //当前目录
+  background-image: url('./shiba1.jpg');
   background-size: cover;
 }
 ```
@@ -1635,6 +1674,328 @@ export class HeroSearchComponent implements OnInit {
 
 > 该组件我们已经添加到根组件的导航栏中了
 
+### 添加验证组件`Auth`
+
+运行如下命令生成验证组件,服务和拦截:
+
+```bash
+ng g c auth/login
+ng g s auth/login
+ng g guard auth/login
+```
+
+`login.service.ts`文件如下:
+
+```ts
+import { Injectable } from '@angular/core';
+import { Observable, of } from 'rxjs';
+import { delay, tap } from 'rxjs/operators';
+
+@Injectable({
+  providedIn: 'root',
+})
+export class AuthService {
+  isLoggedIn = false;
+  redirectUrl: string;
+
+  constructor() {}
+
+  login(): Observable<boolean> {
+    return of(true).pipe(
+      delay(1000),
+      tap(_ => (this.isLoggedIn = true)),
+    );
+  }
+
+  logout(): void {
+    this.isLoggedIn = false;
+  }
+}
+```
+
+`login.guard.ts`文件如下:
+
+```ts
+import { Injectable } from '@angular/core';
+import {
+  CanActivate,
+  ActivatedRouteSnapshot,
+  RouterStateSnapshot,
+  Router,
+} from '@angular/router';
+import { AuthService } from './auth.service';
+
+@Injectable({
+  providedIn: 'root',
+})
+export class AuthGuard implements CanActivate {
+  constructor(private authService: AuthService, private router: Router) {}
+
+  canActivate(
+    next: ActivatedRouteSnapshot,
+    state: RouterStateSnapshot,
+  ): boolean {
+    return this.checkLogin(state.url);
+  }
+
+  checkLogin(url: string): boolean {
+    if (this.authService.isLoggedIn) {
+      return true;
+    }
+    //  保存用户要去的url, 其经过验证后将会自动导向该页面
+    this.authService.redirectUrl = url;
+    this.router.navigate(['/login']);
+    return false;
+  }
+}
+```
+
+登录组件`login.component.ts`文件如下:
+```ts
+import { Component, OnInit } from '@angular/core';
+import { AuthService } from '../auth.service';
+import { Router } from '@angular/router';
+import { FormGroup, FormBuilder } from '@angular/forms';
+
+@Component({
+  selector: 'app-login',
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.scss'],
+})
+export class LoginComponent implements OnInit {
+  loginForm: FormGroup;
+
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private formBuilder: FormBuilder,
+  ) {}
+
+  ngOnInit() {
+    this.loginForm = this.formBuilder.group({
+      username: [''],
+      password: [''],
+    });
+  }
+
+  login() {
+    this.authService.login().subscribe(_ => {
+      if (this.authService.isLoggedIn) {
+        const redirectUrl = this.authService.redirectUrl
+          ? this.router.parseUrl(this.authService.redirectUrl)
+          : '/hero-list';
+        this.router.navigateByUrl(redirectUrl);
+      }
+    });
+  }
+
+  logout() {
+    this.authService.logout();
+  }
+}
+```
+
+模板文件`login.compoent.html`如下:
+
+```html
+<mat-card>
+  <mat-card-title>登 录</mat-card-title>
+  <mat-card-content>
+    <form [formGroup]="loginForm" (ngSubmit)="login()">
+      <p>
+        <mat-form-field>
+          <input type="text" matInput placeholder="用户名" formControlName="username" required>
+          <mat-error>
+            <span *ngIf="!loginForm.get('username').valid && loginForm.get('username').touched">请输入用户名</span>
+          </mat-error>
+        </mat-form-field>
+      </p>
+      <p>
+        <mat-form-field>
+          <input type="password" matInput placeholder="密码" formControlName="password" required>
+          <mat-error>
+            <span *ngIf="!loginForm.get('password').valid && loginForm.get('password').touched">请输入密码</span>
+          </mat-error>
+        </mat-form-field>
+      </p>
+      <p class="button">
+        <button type="submit" mat-flat-button color="primary" [disabled]="!loginForm.valid">确 定</button>
+      </p>
+    </form>
+  </mat-card-content>
+</mat-card>
+```
+
+登录组件样式如下:
+
+```css
+:host {
+  display: flex;
+  justify-content: center;
+  margin: 100px 0px;
+}
+.mat-form-field {
+  width: 100%;
+  min-width: 300px;
+}
+mat-card-title,
+mat-card-content {
+  display: flex;
+  justify-content: center;
+}
+.button {
+  display: flex;
+  justify-content: flex-end;
+}
+```
+
+我们的`详情/添加/编辑`等页面都需要进行路由拦截, 拦截服务的`canActivate`方法返回ture才能激活路由. 更新路由文件如下:
+
+```ts
+import { NgModule } from '@angular/core';
+import { Routes, RouterModule } from '@angular/router';
+import { HeroListComponent } from './hero/hero-list/hero-list.component';
+import { HeroTopComponent } from './hero/hero-top/hero-top.component';
+import { HeroDetailComponent } from './hero/hero-detail/hero-detail.component';
+import { HeroAddComponent } from './hero/hero-add/hero-add.component';
+import { HeroEditComponent } from './hero/hero-edit/hero-edit.component';
+import { HeroDetailResolverService } from './hero/hero-detail/hero-detail-resolver.service';
+import { AuthGuard } from './auth/auth.guard';
+import { LoginComponent } from './auth/login/login.component';
+
+// 这些路由的定义顺序是刻意如此设计的。路由器使用先匹配者优先的策略来匹配路由，所以，具体路由应该放在通用路由的前面。
+// 在上面的配置中，带静态路径的路由被放在了前面，后面是空路径路由，因此它会作为默认路由。
+// 而通配符路由被放在最后面，这是因为它能匹配上每一个 URL，因此应该只有在前面找不到其它能匹配的路由时才匹配它。
+// ---------------------------
+// 路由定义中的 data 属性也定义了与此路由有关的动画配置。当路由变化时，data 属性的值就会传给 AppComponent。
+// data 属性的值必须满足 routeAnimation 中定义的转场动画的要求，稍后我们就会定义它。
+// 注意：这个 data 中的属性名可以是任意的。
+const routes: Routes = [
+  {
+    path: 'hero-list',
+    component: HeroListComponent,
+    data: { animation: 'ListPage' },
+  },
+  {
+    path: 'hero-top',
+    component: HeroTopComponent,
+    data: { animation: 'TopPage' },
+  },
+  {
+    path: 'hero-detail/:id',
+    component: HeroDetailComponent,
+    data: { animation: 'DetailPage' },
+    // 注意使用了resolve预取数据, 且命名为result供组件使用
+    resolve: { result: HeroDetailResolverService},
+    canActivate: [AuthGuard],
+  },
+  {
+    path: 'hero-add',
+    component: HeroAddComponent,
+    data: { animation: 'AddPage' },
+    canActivate: [AuthGuard],
+  },
+  {
+    path: 'hero-edit/:id',
+    component: HeroEditComponent,
+    data: { animation: 'EditPage' },
+  },
+  {
+    path: 'login',
+    component: LoginComponent,
+    pathMatch: 'full',
+  },
+  {
+    path: '',
+    redirectTo: 'hero-list',
+    pathMatch: 'full',
+  },
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule],
+})
+export class AppRoutingModule {}
+```
+
+更新根组件`app.component.ts`类文件如下:
+
+```ts
+import { Component } from '@angular/core';
+import { slideInAnimation } from './app-animations';
+import { RouterOutlet, Router } from '@angular/router';
+import { AuthService } from './auth/auth.service';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.scss'],
+  animations: [slideInAnimation]
+})
+export class AppComponent {
+  title = 'TOH-英雄之旅';
+
+  constructor(public authService: AuthService, private router:Router) {}
+
+  prepareRoute(outlet: RouterOutlet) {
+    return outlet && outlet.activatedRouteData && outlet.activatedRouteData['animation'];
+  }
+
+  login() {
+    this.router.navigate(['/login']);
+  }
+
+  logout() {
+    this.authService.isLoggedIn = false;
+    this.router.navigate(['']);
+  }
+}
+```
+
+更新根组件`app.component.html`模板文件如下:
+
+```html
+<mat-toolbar class="mat-elevation-z6 TOH-nav" color="primary">
+  <mat-icon class="icon">person</mat-icon><span> {{title}}</span>
+  <a mat-button routerLink="/hero-list">
+    <mat-icon class="icon">list</mat-icon>所有英雄
+  </a>
+  <a mat-button routerLink="/hero-top">
+    <mat-icon class="icon">thumb_up</mat-icon>顶级英雄
+  </a>
+  <a mat-button routerLink="/hero-add">
+    <mat-icon class="icon">person_add</mat-icon>添加英雄
+  </a>
+  <a mat-button>
+    <mat-icon class="icon">search</mat-icon>查找英雄
+    <app-hero-search></app-hero-search>
+  </a>
+  
+  <span class="spacer"></span>
+
+  <a mat-button *ngIf="!authService.isLoggedIn" (click)="login()">
+    <mat-icon class="icon">exit_to_app</mat-icon>登录
+  </a>
+  <a mat-button *ngIf="authService.isLoggedIn" (click)="logout()">
+    <mat-icon class="icon">logout</mat-icon>登出
+  </a>
+  <a mat-button href="https://github.com/wang1/toh-all-in-one">
+    <mat-icon class="icon">star</mat-icon>GitHub
+  </a>
+</mat-toolbar>
+<!-- 
+  定义了一个可以检测视图何时发生变化的方法，该方法会基于路由配置的 data 属性值，
+  将动画状态值赋值给动画触发器（@routeAnimation）
+  prepareRoute() 方法会获取这个 outlet 指令的值（通过 #outlet="outlet"），
+  并根据当前活动路由的自定义数据返回一个表示动画状态的字符串值。
+  你可以使用这个数据来控制各个路由之间该执行哪个转场。
+-->
+<div class="container" [@routeAnimations]="prepareRoute(outlet)">
+  <router-outlet #outlet="outlet"></router-outlet>
+</div>
+```
+
 ## 前端运行
 
 至此, 前端开发完毕. 如果应用没有运行, 请使用`ng serve -o`命令, 打开浏览器`localhost:4200`可进行**CRUD**操作.
@@ -1666,7 +2027,7 @@ async function bootstrap() {
     root: join(__dirname, '..', 'client/dist/client'),
     prefix: '/',
   });
-  await app.listen(3000);
+  await app.listen(3000, '0.0.0.0');
 }
 bootstrap();
 ```
@@ -1681,43 +2042,15 @@ bootstrap();
 
 ---
 
-## 改进记录
+## 改进记录--TODO
 
-### 添加Search框
+### 添加Search框-->OK
 
-### 添加转场动画
+### 添加转场动画-->OK
 
-### Resolve: 预先获取组件数据
+### Resolve: 预先获取组件数据-->OK
 
-在 `hero-detail` 中，它必须等待路由激活, 然后才能去获取对应的英雄。
-
-这种方式一般没有问题，但是如果你在使用真实 `api`，很有可能数据返回有延迟，导致无法即时显示。
-在这种情况下，直到数据到达前，显示一个空的组件不是最好的用户体验(且浏览器控制台将出现`undefined`错误, 虽然最后得以成功显示)。
-
-其次, 到该组件的转场动画将不会生效.
-
-再者, 如果当前页面是**英雄详情**页面, 那么在搜索框中点击搜出的某个英雄本应导航到该英雄的详情页面(相同URL, 不同id), 但不会发生跳转!!!因为默认导航方式是: `onsameurlnavigation: ignore`, 而非 `reload` !
-
-因此, 它还有进步的空间。
-
-最好预先从服务器上获取完数据，这样在路由激活的那一刻数据就准备好了。
-总之，你希望的是只有当所有必要数据都已经拿到之后，才渲染这个路由组件。
-
-我们需要 `Resolve` 守卫。在`hero-detail`目录下新建`hero-detail-resolver`服务文件.
-
-实现 resolve() 方法。 该方法可以返回一个 Promise、一个 Observable 来支持异步方式，或者直接返回一个值来支持同步方式。
-
-heroService.getHeroById 方法返回一个可观察对象，以防止在数据获取完之前加载本路由。
-
-Router 守卫要求这个可观察对象必须可结束（complete），也就是说它已经发出了所有值。
-
-你可以为 take 操作符传入一个参数 1，以确保这个可观察对象会在从 heroService.getHeroById 方法所返回的可观察对象中取到第一个值之后就会结束。
-
-将取得的数据重新包装为Observable
-
-将该服务导入hero-detail的路由中, 修改hero-detail组件获取数据的方式
-
-### Apollo-angular Cache
+### Apollo-angular Cache-->OK
 
 ### Guard 及 验证
 

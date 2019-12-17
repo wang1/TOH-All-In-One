@@ -6,6 +6,8 @@ import { HeroDetailComponent } from './hero/hero-detail/hero-detail.component';
 import { HeroAddComponent } from './hero/hero-add/hero-add.component';
 import { HeroEditComponent } from './hero/hero-edit/hero-edit.component';
 import { HeroDetailResolverService } from './hero/hero-detail/hero-detail-resolver.service';
+import { AuthGuard } from './auth/auth.guard';
+import { LoginComponent } from './auth/login/login.component';
 
 // 这些路由的定义顺序是刻意如此设计的。路由器使用先匹配者优先的策略来匹配路由，所以，具体路由应该放在通用路由的前面。
 // 在上面的配置中，带静态路径的路由被放在了前面，后面是空路径路由，因此它会作为默认路由。
@@ -31,16 +33,23 @@ const routes: Routes = [
     data: { animation: 'DetailPage' },
     // 注意使用了resolve预取数据, 且命名为result供组件使用
     resolve: { result: HeroDetailResolverService},
+    canActivate: [AuthGuard],
   },
   {
     path: 'hero-add',
     component: HeroAddComponent,
     data: { animation: 'AddPage' },
+    canActivate: [AuthGuard],
   },
   {
     path: 'hero-edit/:id',
     component: HeroEditComponent,
     data: { animation: 'EditPage' },
+  },
+  {
+    path: 'login',
+    component: LoginComponent,
+    pathMatch: 'full',
   },
   {
     path: '',

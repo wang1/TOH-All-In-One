@@ -15,6 +15,13 @@
   </a>
   
   <span class="spacer"></span>
+
+  <a mat-button *ngIf="!authService.isLoggedIn" (click)="login()">
+    <mat-icon class="icon">exit_to_app</mat-icon>登录
+  </a>
+  <a mat-button *ngIf="authService.isLoggedIn" (click)="logout()">
+    <mat-icon class="icon">logout</mat-icon>登出
+  </a>
   <a mat-button href="https://github.com/wang1/toh-all-in-one">
     <mat-icon class="icon">star</mat-icon>GitHub
   </a>

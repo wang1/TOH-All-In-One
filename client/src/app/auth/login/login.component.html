@@ -1,0 +1,26 @@
+<mat-card>
+  <mat-card-title>登 录</mat-card-title>
+  <mat-card-content>
+    <form [formGroup]="loginForm" (ngSubmit)="login()">
+      <p>
+        <mat-form-field>
+          <input type="text" matInput placeholder="用户名" formControlName="username" required>
+          <mat-error>
+            <span *ngIf="!loginForm.get('username').valid && loginForm.get('username').touched">请输入用户名</span>
+          </mat-error>
+        </mat-form-field>
+      </p>
+      <p>
+        <mat-form-field>
+          <input type="password" matInput placeholder="密码" formControlName="password" required>
+          <mat-error>
+            <span *ngIf="!loginForm.get('password').valid && loginForm.get('password').touched">请输入密码</span>
+          </mat-error>
+        </mat-form-field>
+      </p>
+      <p class="button">
+        <button type="submit" mat-flat-button color="primary" [disabled]="!loginForm.valid">确 定</button>
+      </p>
+    </form>
+  </mat-card-content>
+</mat-card>

@@ -166,7 +166,7 @@ export class HeroService {
       }],
     });
   }
-  // 更新英雄. 似乎它将自动更新apollo的数据缓存
+
   updateHero(heroId: string, hero: any) {
     return this.apollo.mutate<any>({
       mutation: this.updateHeroGql,
@@ -178,6 +178,10 @@ export class HeroService {
         description: hero.description,
         isTop: hero.isTop,
       },
+      // 更新英雄后,使用refetchQueries执行查询以更新apollo的数据缓存, 保证其它组件显示数据的正常
+      refetchQueries: [{
+        query: this.getHeroesGql,
+      }],
     });
   }
 }
